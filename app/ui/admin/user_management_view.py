@@ -1,0 +1,110 @@
+"""Alta y consulta de cuentas de Agentes del PAE y Abogados (el Administrador es único)."""
+
+from __future__ import annotations
+
+from PySide6.QtWidgets import (
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from app.auth.passwords import hash_password
+from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
+from app.db.repositories import users as users_repo
+
+
+class UserManagementView(QWidget):
+    def __init__(self, admin_user: users_repo.User, parent=None):
+        super().__init__(parent)
+        self.admin_user = admin_user
+
+        layout = QHBoxLayout(self)
+        layout.addWidget(self._build_role_box("Agentes del PAE", ROLE_AGENTE_PAE, with_password=False))
+        layout.addWidget(self._build_role_box("Abogados", ROLE_ABOGADO, with_password=True))
+
+    def _build_role_box(self, title: str, role: str, *, with_password: bool) -> QGroupBox:
+        box = QGroupBox(title)
+        layout = QVBoxLayout(box)
+
+        table = QTableWidget(0, 4)
+        table.setHorizontalHeaderLabels(["Usuario", "Nombre", "Correo", "Activo"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(table)
+
+        username_input = QLineEdit()
+        username_input.setPlaceholderText("Usuario")
+        fullname_input = QLineEdit()
+        fullname_input.setPlaceholderText("Nombre completo")
+        email_input = QLineEdit()
+        email_input.setPlaceholderText("Correo electrónico")
+        layout.addWidget(username_input)
+        layout.addWidget(fullname_input)
+        layout.addWidget(email_input)
+
+        password_input = None
+        if with_password:
+            password_input = QLineEdit()
+            password_input.setPlaceholderText("Contraseña inicial")
+            password_input.setEchoMode(QLineEdit.EchoMode.Password)
+            layout.addWidget(password_input)
+        else:
+            layout.addWidget(QLabel("El certificado se genera en su primer inicio de sesión."))
+
+        add_btn = QPushButton(f"Agregar")
+        layout.addWidget(add_btn)
+
+        def refresh() -> None:
+            table.setRowCount(0)
+            for u in users_repo.list_by_role(role, active_only=False):
+                row = table.rowCount()
+                table.insertRow(row)
+                table.setItem(row, 0, QTableWidgetItem(u.username))
+                table.setItem(row, 1, QTableWidgetItem(u.full_name))
+                table.setItem(row, 2, QTableWidgetItem(u.email or ""))
+                table.setItem(row, 3, QTableWidgetItem("Sí" if u.active else "No"))
+
+        def on_add() -> None:
+            username = username_input.text().strip()
+            full_name = fullname_input.text().strip()
+            email = email_input.text().strip()
+            if not username or not full_name:
+                QMessageBox.warning(self, "Datos incompletos", "Usuario y nombre completo son obligatorios.")
+                return
+            if users_repo.get_by_username(username) is not None:
+                QMessageBox.warning(self, "Usuario existente", f"Ya existe un usuario '{username}'.")
+                return
+
+            if with_password:
+                password = password_input.text()
+                if len(password) < 6:
+                    QMessageBox.warning(self, "Contraseña inválida", "La contraseña debe tener al menos 6 caracteres.")
+                    return
+                pwd_hash, salt = hash_password(password)
+                users_repo.create_user(
+                    username=username, role=role, full_name=full_name, email=email,
+                    auth_type=AUTH_TYPE_PASSWORD, password_hash=pwd_hash, password_salt=salt,
+                )
+                password_input.clear()
+            else:
+                users_repo.create_user(
+                    username=username, role=role, full_name=full_name, email=email,
+                    auth_type=AUTH_TYPE_CERTIFICADO,
+                )
+
+            username_input.clear()
+            fullname_input.clear()
+            email_input.clear()
+            refresh()
+
+        add_btn.clicked.connect(on_add)
+        refresh()
+        return box

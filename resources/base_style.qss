@@ -1,0 +1,31 @@
+/* Estilo base del Sistema PAE. El Administrador puede añadir color/imagen de fondo
+   adicionales desde la pestaña "Apariencia", que se agregan a continuación de esto. */
+
+QMainWindow, QDialog {
+    background-color: #f4f6f8;
+}
+
+QTabWidget::pane {
+    border: 1px solid #c9d2da;
+}
+
+QPushButton {
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid #94a3b8;
+    background-color: #ffffff;
+}
+
+QPushButton:hover {
+    background-color: #e2e8f0;
+}
+
+QTableWidget {
+    gridline-color: #cbd5e1;
+}
+
+QHeaderView::section {
+    background-color: #1f3a5f;
+    color: white;
+    padding: 4px;
+}

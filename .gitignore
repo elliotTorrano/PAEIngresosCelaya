@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.claude/
+
+# Datos locales del programa (BD, exportados, certificados, apariencia) — no se versionan.
+data/
+
+# Artefactos de PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Entornos virtuales, si se usan
+.venv/
+venv/
