@@ -1,32 +1,55 @@
-"""Asistente de primer arranque: crea el súper-usuario único y el primer Administrador."""
+"""Alta automática y determinista del súper-usuario y el Administrador únicos.
+
+Estas cuentas ya no se piden de forma interactiva: se siembran (si no existen
+todavía en esta base de datos local) a partir de resources/seed_accounts.json,
+que se empaqueta junto con el programa. Así, sin importar en qué máquina o
+cuántas veces se ejecute el .exe, siempre se crea exactamente la misma cuenta
+de súper-usuario y de Administrador -- nunca se vuelve a preguntar.
+"""
 
 from __future__ import annotations
 
+import json
+
 from app.config import AUTH_TYPE_CERTIFICADO, ROLE_ADMINISTRADOR, ROLE_SUPERUSUARIO
 from app.db.repositories import users as users_repo
+from app.utils.paths import resource_dir
+
+SEED_FILE_NAME = "seed_accounts.json"
 
 
-def needs_first_run() -> bool:
-    return users_repo.count_by_role(ROLE_SUPERUSUARIO) == 0
+class SeedFileMissingError(Exception):
+    """resources/seed_accounts.json no está presente o es inválido."""
 
 
-def create_superuser(*, username: str, full_name: str, email: str) -> users_repo.User:
-    return users_repo.create_user(
-        username=username,
-        role=ROLE_SUPERUSUARIO,
-        full_name=full_name,
-        email=email,
-        auth_type=AUTH_TYPE_CERTIFICADO,
-    )
+def _load_seed() -> dict:
+    path = resource_dir() / SEED_FILE_NAME
+    if not path.exists():
+        raise SeedFileMissingError(f"No se encontró {path}. El programa no puede crear sus cuentas base.")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SeedFileMissingError(f"No se pudo leer {path}: {exc}") from exc
 
 
-def create_first_administrator(*, username: str, full_name: str, email: str) -> users_repo.User:
-    if users_repo.count_by_role(ROLE_ADMINISTRADOR) > 0:
-        raise ValueError("Ya existe un Administrador; sólo puede haber uno.")
-    return users_repo.create_user(
-        username=username,
-        role=ROLE_ADMINISTRADOR,
-        full_name=full_name,
-        email=email,
-        auth_type=AUTH_TYPE_CERTIFICADO,
-    )
+def ensure_seed_accounts() -> None:
+    """Crea el súper-usuario y el Administrador únicos si todavía no existen
+    localmente. Idempotente: en instalaciones ya sembradas no hace nada."""
+    if users_repo.count_by_role(ROLE_SUPERUSUARIO) > 0 and users_repo.count_by_role(ROLE_ADMINISTRADOR) > 0:
+        return
+
+    seed = _load_seed()
+
+    if users_repo.count_by_role(ROLE_SUPERUSUARIO) == 0:
+        su = seed["superusuario"]
+        users_repo.create_user(
+            username=su["username"], role=ROLE_SUPERUSUARIO, full_name=su["full_name"],
+            email=su["email"], auth_type=AUTH_TYPE_CERTIFICADO,
+        )
+
+    if users_repo.count_by_role(ROLE_ADMINISTRADOR) == 0:
+        admin = seed["administrador"]
+        users_repo.create_user(
+            username=admin["username"], role=ROLE_ADMINISTRADOR, full_name=admin["full_name"],
+            email=admin["email"], auth_type=AUTH_TYPE_CERTIFICADO,
+        )

@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtWidgets import QApplication, QDialog
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from app.auth import first_run, session
 from app.db.migrations import ensure_schema
-from app.ui.login.first_run_wizard import FirstRunWizard
 from app.ui.login.login_window import LoginWindow
 from app.ui.main_window import MainWindow
 from app.ui.widgets.styles import apply_app_icon
@@ -19,10 +18,11 @@ def main() -> int:
     ensure_schema()
     apply_app_icon(app)
 
-    if first_run.needs_first_run():
-        wizard = FirstRunWizard()
-        if wizard.exec() != QDialog.DialogCode.Accepted:
-            return 0
+    try:
+        first_run.ensure_seed_accounts()
+    except first_run.SeedFileMissingError as exc:
+        QMessageBox.critical(None, "Error de instalación", str(exc))
+        return 1
 
     while True:
         login = LoginWindow()

@@ -1,0 +1,13 @@
+{
+  "_comentario": "Identidad fija del único súper-usuario y del único Administrador. Se crean automáticamente, sin preguntar, la primera vez que el programa detecta que no existen en la base de datos local -- son siempre los mismos, sin importar en qué máquina o cuántas veces se ejecute el programa. EDITAR estos valores con los datos reales ANTES de generar el .exe que se distribuirá.",
+  "superusuario": {
+    "username": "CAMBIAR_superusuario",
+    "full_name": "CAMBIAR - Nombre del súper-usuario",
+    "email": "cambiar-superusuario@ejemplo.com"
+  },
+  "administrador": {
+    "username": "CAMBIAR_administrador",
+    "full_name": "CAMBIAR - Nombre del Administrador",
+    "email": "cambiar-administrador@ejemplo.com"
+  }
+}

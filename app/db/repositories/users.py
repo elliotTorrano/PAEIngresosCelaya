@@ -20,6 +20,7 @@ class User:
     password_salt: str | None
     cert_public_pem: str | None
     cert_serial: str | None
+    must_change_password: bool
     active: bool
 
     @classmethod
@@ -35,6 +36,7 @@ class User:
             password_salt=row["password_salt"],
             cert_public_pem=row["cert_public_pem"],
             cert_serial=row["cert_serial"],
+            must_change_password=bool(row["must_change_password"]),
             active=bool(row["active"]),
         )
 
@@ -77,14 +79,15 @@ def create_user(
     auth_type: str,
     password_hash: str | None = None,
     password_salt: str | None = None,
+    must_change_password: bool = False,
 ) -> User:
     conn = get_connection()
     cur = conn.execute(
         """
-        INSERT INTO users (username, role, full_name, email, auth_type, password_hash, password_salt)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (username, role, full_name, email, auth_type, password_hash, password_salt, must_change_password)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (username, role, full_name, email, auth_type, password_hash, password_salt),
+        (username, role, full_name, email, auth_type, password_hash, password_salt, 1 if must_change_password else 0),
     )
     conn.commit()
     return get_by_id(cur.lastrowid)  # type: ignore[return-value]
@@ -103,15 +106,15 @@ def set_certificate(user_id: int, *, cert_public_pem: str, cert_serial: str) -> 
     conn.commit()
 
 
-def set_password(user_id: int, *, password_hash: str, password_salt: str) -> None:
+def set_password(user_id: int, *, password_hash: str, password_salt: str, must_change_password: bool = False) -> None:
     conn = get_connection()
     conn.execute(
         """
         UPDATE users
-        SET password_hash = ?, password_salt = ?, updated_at = datetime('now')
+        SET password_hash = ?, password_salt = ?, must_change_password = ?, updated_at = datetime('now')
         WHERE id = ?
         """,
-        (password_hash, password_salt, user_id),
+        (password_hash, password_salt, 1 if must_change_password else 0, user_id),
     )
     conn.commit()
 

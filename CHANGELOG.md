@@ -1,5 +1,20 @@
 # Historial de versiones — Sistema PAE
 
+## 0.2.0
+
+- El Súper-usuario y el Administrador ya no se crean con un asistente interactivo:
+  se siembran automáticamente y en silencio desde `resources/seed_accounts.json`
+  la primera vez que faltan en la base de datos local. Como ese archivo se
+  empaqueta con el programa, la cuenta creada es siempre la misma sin importar
+  en qué máquina o cuántas veces se ejecute el `.exe` — nunca se vuelve a pedir.
+  **Antes de generar el `.exe` para distribuir, edítese ese archivo con los
+  datos reales.**
+- El Abogado debe cambiar su contraseña obligatoriamente la primera vez que
+  inicia sesión (o después de que el Administrador le asigna una nueva por un
+  reset), mediante un diálogo que no se puede omitir.
+- En las pantallas de login (usuario, contraseña y certificado) la tecla Enter
+  ahora dispara el botón "Iniciar sesión"/"Continuar" correspondiente.
+
 ## 0.1.0
 
 Primera fase del programa:

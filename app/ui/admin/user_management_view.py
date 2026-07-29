@@ -92,6 +92,7 @@ class UserManagementView(QWidget):
                 users_repo.create_user(
                     username=username, role=role, full_name=full_name, email=email,
                     auth_type=AUTH_TYPE_PASSWORD, password_hash=pwd_hash, password_salt=salt,
+                    must_change_password=True,
                 )
                 password_input.clear()
             else:

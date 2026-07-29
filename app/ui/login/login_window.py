@@ -28,6 +28,7 @@ from app.auth.crypto_certs import (
 from app.auth.passwords import verify_password
 from app.config import APP_NAME, AUTH_TYPE_CERTIFICADO
 from app.db.repositories import users as users_repo
+from app.ui.login.change_password_dialog import ChangePasswordDialog
 from app.ui.login.enrollment_dialog import EnrollmentDialog
 from app.ui.login.forgot_password_dialog import ForgotPasswordDialog
 from app.ui.login.import_update_dialog import ImportUpdateDialog
@@ -69,8 +70,12 @@ class LoginWindow(QDialog):
         layout.addWidget(self.username_input)
 
         continue_btn = QPushButton("Continuar")
+        continue_btn.setDefault(True)
+        continue_btn.setAutoDefault(True)
         continue_btn.clicked.connect(self._on_continue)
         layout.addWidget(continue_btn)
+
+        self.username_input.returnPressed.connect(self._on_continue)
         return page
 
     def _on_continue(self) -> None:
@@ -103,8 +108,12 @@ class LoginWindow(QDialog):
         layout.addWidget(self.password_input)
 
         login_btn = QPushButton("Iniciar sesión")
+        login_btn.setDefault(True)
+        login_btn.setAutoDefault(True)
         login_btn.clicked.connect(self._on_login_password)
         layout.addWidget(login_btn)
+
+        self.password_input.returnPressed.connect(self._on_login_password)
         return page
 
     def _on_login_password(self) -> None:
@@ -113,6 +122,14 @@ class LoginWindow(QDialog):
         if not user.password_hash or not verify_password(password, user.password_hash, user.password_salt):
             QMessageBox.warning(self, "Contraseña incorrecta", "La contraseña no es válida.")
             return
+
+        if user.must_change_password:
+            change_dialog = ChangePasswordDialog(user, parent=self)
+            if change_dialog.exec() != QDialog.DialogCode.Accepted:
+                self.stack.setCurrentIndex(0)
+                return
+            user = users_repo.get_by_id(user.id)
+
         self._finish_login(user)
 
     # --- Página 3: certificado (Súper-usuario/Administrador/Agente) ------------
@@ -134,8 +151,12 @@ class LoginWindow(QDialog):
         layout.addWidget(self.cert_password_input)
 
         login_btn = QPushButton("Iniciar sesión")
+        login_btn.setDefault(True)
+        login_btn.setAutoDefault(True)
         login_btn.clicked.connect(self._on_login_cert)
         layout.addWidget(login_btn)
+
+        self.cert_password_input.returnPressed.connect(self._on_login_cert)
         return page
 
     def _on_browse_cert(self) -> None:

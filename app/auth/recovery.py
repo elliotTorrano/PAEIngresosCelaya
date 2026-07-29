@@ -141,9 +141,13 @@ def apply_update_package(payload: dict) -> str:
     action = payload.get("action")
     if action == ACTION_SET_PASSWORD:
         users_repo.set_password(
-            user.id, password_hash=payload["password_hash"], password_salt=payload["password_salt"]
+            user.id, password_hash=payload["password_hash"], password_salt=payload["password_salt"],
+            must_change_password=True,
         )
-        return f"Se actualizó la contraseña de '{user.username}'. Ya puede iniciar sesión con la nueva."
+        return (
+            f"Se actualizó la contraseña de '{user.username}'. Al iniciar sesión con la nueva "
+            "contraseña, se le pedirá establecer una definitiva."
+        )
     elif action == ACTION_ALLOW_REENROLL:
         users_repo.clear_certificate(user.id)
         return f"Se habilitó a '{user.username}' para generar un nuevo certificado en su siguiente inicio de sesión."
