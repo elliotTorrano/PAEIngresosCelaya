@@ -1,25 +1,28 @@
 """Alta automática y determinista del súper-usuario y el Administrador únicos.
 
 Estas cuentas ya no se piden de forma interactiva: se siembran (si no existen
-todavía en esta base de datos local) a partir de resources/seed_accounts.json,
-que se empaqueta junto con el programa. Así, sin importar en qué máquina o
-cuántas veces se ejecute el .exe, siempre se crea exactamente la misma cuenta
-de súper-usuario y de Administrador -- nunca se vuelve a preguntar.
+todavía en esta base de datos local) a partir de resources/seed_accounts.enc
+-- un archivo cifrado que se empaqueta junto con el programa (ver
+app/auth/seed_crypto.py y packaging/generate_seed.py). Así, sin importar en
+qué máquina o cuántas veces se ejecute el .exe, siempre se crea exactamente
+la misma cuenta de súper-usuario y de Administrador -- nunca se vuelve a
+preguntar, y el nombre/correo reales no quedan en texto plano dentro del .exe.
 """
 
 from __future__ import annotations
 
 import json
 
+from app.auth.seed_crypto import decrypt_seed
 from app.config import AUTH_TYPE_CERTIFICADO, ROLE_ADMINISTRADOR, ROLE_SUPERUSUARIO
 from app.db.repositories import users as users_repo
 from app.utils.paths import resource_dir
 
-SEED_FILE_NAME = "seed_accounts.json"
+SEED_FILE_NAME = "seed_accounts.enc"
 
 
 class SeedFileMissingError(Exception):
-    """resources/seed_accounts.json no está presente o es inválido."""
+    """resources/seed_accounts.enc no está presente o es inválido."""
 
 
 def _load_seed() -> dict:
@@ -27,8 +30,9 @@ def _load_seed() -> dict:
     if not path.exists():
         raise SeedFileMissingError(f"No se encontró {path}. El programa no puede crear sus cuentas base.")
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        plaintext = decrypt_seed(path.read_bytes())
+        return json.loads(plaintext.decode("utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
         raise SeedFileMissingError(f"No se pudo leer {path}: {exc}") from exc
 
 

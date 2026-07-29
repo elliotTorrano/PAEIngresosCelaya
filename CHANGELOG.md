@@ -1,5 +1,26 @@
 # Historial de versiones — Sistema PAE
 
+## 0.3.0
+
+- El súper-usuario y el Administrador tienen ahora sus datos reales de
+  identidad sembrados (antes traían valores de ejemplo "CAMBIAR_...").
+- Los datos de identidad (usuario, nombre completo, correo) del Administrador
+  pueden cambiarse desde el menú del súper-usuario o del propio Administrador
+  ("Datos de cuenta"); los del súper-usuario, sólo desde su propio menú. En
+  ambos casos se exige confirmar primero con el certificado .pfx ACTUAL de la
+  cuenta afectada, y el cambio obliga a generar un certificado nuevo en el
+  siguiente inicio de sesión de esa cuenta.
+- `resources/seed_accounts.enc` reemplaza al `seed_accounts.json` en texto
+  plano: el nombre/correo reales del súper-usuario y del Administrador viajan
+  cifrados dentro del `.exe`, para que no queden a la vista si alguien
+  extrae los recursos empaquetados. La clave vive en el propio binario (ver
+  `app/auth/seed_crypto.py`), así que esto es una barrera contra la lectura
+  casual, no un secreto criptográficamente inviolable frente a un atacante
+  dispuesto a decompilar el ejecutable.
+- Nueva herramienta de desarrollo `packaging/generate_seed.py` para regenerar
+  ese archivo cifrado cuando cambien los datos por defecto antes de compilar
+  una nueva distribución.
+
 ## 0.2.0
 
 - El Súper-usuario y el Administrador ya no se crean con un asistente interactivo:

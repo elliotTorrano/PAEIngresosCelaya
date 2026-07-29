@@ -1,4 +1,4 @@
-from app.config import AUTH_TYPE_PASSWORD, ROLE_ABOGADO
+from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_ADMINISTRADOR
 from app.db.repositories import users as users_repo
 
 
@@ -21,3 +21,21 @@ def test_create_user_defaults_to_no_forced_change(db):
         auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
     )
     assert user.must_change_password is False
+
+
+def test_update_identity_and_clear_certificate(db):
+    admin = users_repo.create_user(
+        username="admin", role=ROLE_ADMINISTRADOR, full_name="Administrador", email="admin@example.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    users_repo.set_certificate(admin.id, cert_public_pem="PEM-FALSO", cert_serial="abc123")
+    assert users_repo.has_certificate(users_repo.get_by_id(admin.id))
+
+    users_repo.update_identity(admin.id, username="admin2", full_name="Administrador Nuevo", email="nuevo@example.com")
+    users_repo.clear_certificate(admin.id)
+
+    refreshed = users_repo.get_by_id(admin.id)
+    assert refreshed.username == "admin2"
+    assert refreshed.full_name == "Administrador Nuevo"
+    assert refreshed.email == "nuevo@example.com"
+    assert not users_repo.has_certificate(refreshed)

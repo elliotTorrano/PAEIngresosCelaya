@@ -119,6 +119,21 @@ def set_password(user_id: int, *, password_hash: str, password_salt: str, must_c
     conn.commit()
 
 
+def update_identity(user_id: int, *, username: str, full_name: str, email: str | None) -> None:
+    """Cambia usuario/nombre/correo. El llamador es responsable de validar unicidad
+    de `username` y de exigir la confirmación por certificado correspondiente."""
+    conn = get_connection()
+    conn.execute(
+        """
+        UPDATE users
+        SET username = ?, full_name = ?, email = ?, updated_at = datetime('now')
+        WHERE id = ?
+        """,
+        (username, full_name, email, user_id),
+    )
+    conn.commit()
+
+
 def set_active(user_id: int, active: bool) -> None:
     conn = get_connection()
     conn.execute(

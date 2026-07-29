@@ -1,17 +1,20 @@
+import json
+
 import pytest
 
 from app.auth import first_run
+from app.auth.seed_crypto import encrypt_seed
 from app.config import ROLE_ADMINISTRADOR, ROLE_SUPERUSUARIO
 from app.db.repositories import users as users_repo
 
 
 def _write_seed(tmp_path):
-    seed_path = tmp_path / "seed_accounts.json"
-    seed_path.write_text(
-        '{"superusuario": {"username": "su1", "full_name": "Super Uno", "email": "su1@example.com"},'
-        ' "administrador": {"username": "admin1", "full_name": "Admin Uno", "email": "admin1@example.com"}}',
-        encoding="utf-8",
-    )
+    seed_path = tmp_path / "seed_accounts.enc"
+    data = {
+        "superusuario": {"username": "su1", "full_name": "Super Uno", "email": "su1@example.com"},
+        "administrador": {"username": "admin1", "full_name": "Admin Uno", "email": "admin1@example.com"},
+    }
+    seed_path.write_bytes(encrypt_seed(json.dumps(data).encode("utf-8")))
     return seed_path
 
 
@@ -36,5 +39,16 @@ def test_ensure_seed_accounts_creates_once(db, monkeypatch, tmp_path):
 
 def test_ensure_seed_accounts_missing_file_raises(db, monkeypatch, tmp_path):
     monkeypatch.setattr(first_run, "resource_dir", lambda: tmp_path)
+    with pytest.raises(first_run.SeedFileMissingError):
+        first_run.ensure_seed_accounts()
+
+
+def test_ensure_seed_accounts_rejects_tampered_file(db, monkeypatch, tmp_path):
+    seed_path = _write_seed(tmp_path)
+    tampered = bytearray(seed_path.read_bytes())
+    tampered[-1] ^= 0xFF
+    seed_path.write_bytes(bytes(tampered))
+    monkeypatch.setattr(first_run, "resource_dir", lambda: tmp_path)
+
     with pytest.raises(first_run.SeedFileMissingError):
         first_run.ensure_seed_accounts()

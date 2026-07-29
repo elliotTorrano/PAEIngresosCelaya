@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -10,4 +10,9 @@ VERSION_NOTES = {
               "sin importar la máquina); cambio de contraseña obligatorio para el Abogado "
               "en su primer inicio de sesión o tras un reset; tecla Enter vinculada al "
               "botón 'Iniciar sesión' en las pantallas de login.",
+    "0.3.0": "Los datos de identidad (usuario/nombre/correo) del Administrador y del "
+              "súper-usuario ya pueden cambiarse desde el programa, siempre confirmando "
+              "con el certificado ACTUAL de la cuenta afectada; el cambio obliga a generar "
+              "un certificado nuevo. El archivo de sembrado del súper-usuario/Administrador "
+              "ahora viaja cifrado dentro del .exe.",
 }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -18,13 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.auth import session
-from app.auth.crypto_certs import (
-    InvalidCertificateFile,
-    cert_matches_serial,
-    load_bundle,
-    sign_challenge,
-    verify_challenge,
-)
+from app.auth.cert_auth import verify_certificate_file
 from app.auth.passwords import verify_password
 from app.config import APP_NAME, AUTH_TYPE_CERTIFICADO
 from app.db.repositories import users as users_repo
@@ -172,25 +167,9 @@ class LoginWindow(QDialog):
             return
 
         password = self.cert_password_input.text()
-        try:
-            with open(self._cert_path, "rb") as f:
-                pfx_bytes = f.read()
-            private_key, certificate = load_bundle(pfx_bytes, password)
-        except InvalidCertificateFile:
-            QMessageBox.warning(self, "Certificado inválido", "El archivo o la contraseña no son correctos.")
-            return
-        except OSError as exc:
-            QMessageBox.warning(self, "No se pudo leer el archivo", str(exc))
-            return
-
-        if not cert_matches_serial(certificate, user.cert_serial or ""):
-            QMessageBox.warning(self, "Certificado no reconocido", "Este certificado no corresponde a este usuario.")
-            return
-
-        challenge = os.urandom(32)
-        signature = sign_challenge(private_key, challenge)
-        if not verify_challenge(user.cert_public_pem, challenge, signature):
-            QMessageBox.warning(self, "Verificación fallida", "No se pudo verificar el certificado.")
+        ok, message = verify_certificate_file(user, Path(self._cert_path), password)
+        if not ok:
+            QMessageBox.warning(self, "No se pudo iniciar sesión", message)
             return
 
         self._finish_login(user)
