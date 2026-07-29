@@ -130,6 +130,10 @@ class RequerimientosCaptureView(QWidget):
 
         batch_id = req_repo.create_batch(abogado_id=self.abogado_user.id, agente_id=agente.id)
         req_repo.add_rows(batch_id, rows)
+        req_repo.record_imported_file(
+            original_filename=Path(file_path).name, agente_id=agente.id, abogado_id=self.abogado_user.id,
+            batch_id=batch_id, row_count=len(rows),
+        )
         self._refresh_batch_list()
         self._load_batch(batch_id)
         QMessageBox.information(self, "Importado", f"Se importaron {len(rows)} filas al lote #{batch_id}.")

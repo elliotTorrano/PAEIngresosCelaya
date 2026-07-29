@@ -1,3 +1,7 @@
+import os
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 import pytest
 
 from app.db import connection as connection_module
@@ -13,3 +17,14 @@ def db(tmp_path, monkeypatch):
     ensure_schema()
     yield
     connection_module._connection = None
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    """QApplication headless compartida para pruebas que construyen widgets."""
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    return app

@@ -1,5 +1,25 @@
 # Historial de versiones — Sistema PAE
 
+## 0.4.0
+
+- **Respaldo automático antes de migrar el esquema**: cuando una nueva versión
+  del programa necesita cambiar la estructura de la base (como el
+  `must_change_password` de la 0.2.0), antes de aplicar el cambio se copia
+  `pae.db` a `pae.db.bak-vN` (N = la versión anterior). Así, actualizar el
+  `.exe` nunca pone en riesgo los datos ya capturados: sólo se reemplaza el
+  archivo del programa, `data/` se queda intacta y, si algo saliera mal, el
+  respaldo previo a la migración sigue ahí.
+- **Nueva pestaña "Trazabilidad"** (sólo Administrador y súper-usuario): permite
+  importar, en modo de sólo lectura, el archivo `pae.db` de otra computadora
+  (de un Agente del PAE o un Abogado) para revisar qué se importó y capturó,
+  cuándo y por quién — sin fusionarlo ni modificar la base propia. Usa las
+  columnas de trazabilidad que ya existían en `imported_files`
+  (`imported_at`, `agente_id`, `abogado_id`).
+- Se corrigió que el import del Abogado (cuando carga el archivo del Agente
+  del PAE) no quedaba registrado en `imported_files` — sólo se registraba el
+  import del lado del Agente. Ahora ambos eventos quedan trazados con fecha,
+  hora, agente y abogado.
+
 ## 0.3.0
 
 - El súper-usuario y el Administrador tienen ahora sus datos reales de

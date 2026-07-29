@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -15,4 +15,9 @@ VERSION_NOTES = {
               "con el certificado ACTUAL de la cuenta afectada; el cambio obliga a generar "
               "un certificado nuevo. El archivo de sembrado del súper-usuario/Administrador "
               "ahora viaja cifrado dentro del .exe.",
+    "0.4.0": "Respaldo automático de pae.db antes de cualquier migración de esquema; "
+              "nueva pestaña 'Trazabilidad' (sólo Administrador/súper-usuario) para "
+              "importar en modo sólo lectura el pae.db de otra máquina y revisar qué se "
+              "importó/capturó, cuándo y por quién; se corrigió que el import del Abogado "
+              "no quedaba registrado en el historial de archivos importados.",
 }

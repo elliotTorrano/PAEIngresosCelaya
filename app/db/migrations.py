@@ -30,7 +30,13 @@ def ensure_schema() -> None:
         return
 
     version = row["version"]
-    for target_version in sorted(v for v in _MIGRATIONS if v > version):
+    pending = sorted(v for v in _MIGRATIONS if v > version)
+    if not pending:
+        return
+
+    _backup_before_migration(conn, version)
+
+    for target_version in pending:
         try:
             conn.execute(_MIGRATIONS[target_version])
         except sqlite3.OperationalError:
@@ -38,3 +44,25 @@ def ensure_schema() -> None:
         conn.execute("UPDATE schema_version SET version = ?", (target_version,))
         conn.commit()
         version = target_version
+
+
+def _backup_before_migration(conn: sqlite3.Connection, current_version: int) -> None:
+    """Copia pae.db a pae.db.bak-vN (N = versión ANTES de migrar) por si una
+    migración falla o daña datos. No sobrescribe un respaldo que ya exista
+    para esa versión (no vuelve a respaldar en cada arranque, sólo la primera
+    vez que se detectan migraciones pendientes desde esa versión)."""
+    from app.db import connection as connection_module
+
+    db_file = connection_module.db_path()
+    if not db_file.exists():
+        return  # base en memoria o inexistente (p. ej. en pruebas): nada que respaldar
+
+    backup_path = db_file.with_name(f"{db_file.stem}.bak-v{current_version}{db_file.suffix}")
+    if backup_path.exists():
+        return
+
+    backup_conn = sqlite3.connect(str(backup_path))
+    try:
+        conn.backup(backup_conn)
+    finally:
+        backup_conn.close()

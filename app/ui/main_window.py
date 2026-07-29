@@ -53,6 +53,7 @@ class MainWindow(QMainWindow):
 
         if role in (ROLE_ADMINISTRADOR, ROLE_SUPERUSUARIO):
             from app.ui.admin.account_settings_view import AccountSettingsView
+            from app.ui.admin.audit_view import AuditView
             from app.ui.admin.user_management_view import UserManagementView
             from app.ui.admin.appearance_settings_view import AppearanceSettingsView
             from app.ui.admin.reset_requests_view import ResetRequestsView
@@ -61,6 +62,7 @@ class MainWindow(QMainWindow):
             self.tabs.addTab(ResetRequestsView(self.user), "Solicitudes de reset")
             self.tabs.addTab(AppearanceSettingsView(self.user), "Apariencia")
             self.tabs.addTab(AccountSettingsView(self.user), "Datos de cuenta")
+            self.tabs.addTab(AuditView(self.user), "Trazabilidad")
 
         placeholder = QLabel(
             "El Formato de Mandamientos y los Reportes de Requerimientos/Mandamientos "
