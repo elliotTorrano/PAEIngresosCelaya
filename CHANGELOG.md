@@ -1,5 +1,14 @@
 # Historial de versiones — Sistema PAE
 
+## 0.4.1
+
+- **Corrección de bug**: al importar Excel como Agente del PAE, si un archivo
+  no producía filas (por ejemplo un archivo de prueba sin la fila final de
+  totales que el formato real siempre trae) o no se podía leer (formato
+  inválido, o un `.xls` antiguo que la librería de lectura no soporta), el
+  programa no mostraba nada — parecía que el botón no hacía nada. Ahora
+  siempre aparece un aviso explicando qué archivo falló y por qué.
+
 ## 0.4.0
 
 - **Respaldo automático antes de migrar el esquema**: cuando una nueva versión

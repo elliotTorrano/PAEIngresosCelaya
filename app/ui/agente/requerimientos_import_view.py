@@ -83,15 +83,47 @@ class RequerimientosImportView(QWidget):
                 return
 
         already_seen_this_batch = set(self._source_filenames)
+        failed: list[str] = []
+        empty: list[str] = []
+
         for path in paths:
             if path.name in duplicates or path.name in already_seen_this_batch:
                 continue
-            result = parse_requerimientos_file(path)
+
+            try:
+                result = parse_requerimientos_file(path)
+            except Exception as exc:  # noqa: BLE001
+                failed.append(f"{path.name}: {exc}")
+                continue
+
+            if result.row_count == 0:
+                empty.append(path.name)
+                continue
+
             self._rows.extend(result.rows)
             self._source_filenames.append(path.name)
             already_seen_this_batch.add(path.name)
 
         self._refresh_preview()
+
+        if failed:
+            QMessageBox.critical(
+                self,
+                "No se pudieron leer algunos archivos",
+                "No se pudo abrir el archivo o no tiene un formato de Excel válido (.xlsx). "
+                "Si es un archivo .xls antiguo, ábralo en Excel y guárdelo como .xlsx antes "
+                "de importarlo.\n\n" + "\n".join(failed),
+            )
+        if empty:
+            QMessageBox.warning(
+                self,
+                "Sin filas de datos",
+                "No se encontraron filas de datos en:\n\n" + "\n".join(empty) + "\n\n"
+                "Recuerde que siempre se omiten las primeras 2 filas y la última fila de "
+                "cada archivo (encabezados y pie de página). Si su archivo de prueba no "
+                "tiene esa forma -- por ejemplo, no tiene una fila final después de los "
+                "datos -- la última fila real se descarta por error.",
+            )
 
     def _refresh_preview(self) -> None:
         self.count_label.setText(f"Filas importadas: {len(self._rows)}")

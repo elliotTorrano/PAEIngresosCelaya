@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -20,4 +20,8 @@ VERSION_NOTES = {
               "importar en modo sólo lectura el pae.db de otra máquina y revisar qué se "
               "importó/capturó, cuándo y por quién; se corrigió que el import del Abogado "
               "no quedaba registrado en el historial de archivos importados.",
+    "0.4.1": "Corrección: el Agente del PAE ya no importa en silencio. Si un archivo "
+              "no tiene filas de datos (p. ej. porque no tiene fila final de totales) "
+              "o no se pudo leer (formato inválido/.xls antiguo), ahora se muestra un "
+              "aviso claro en vez de no hacer nada.",
 }
