@@ -43,6 +43,24 @@ rm -rf dist_new build
 Antes de compilar, asegúrate de que `SistemaPAE.exe` no esté abierto en esta
 computadora (si lo está, ciérralo primero).
 
+### 4.1 Empaquetar el .zip para instalaciones nuevas
+
+`updater.exe` nunca se sube al Release (ver más abajo), así que alguien que
+**nunca** ha tenido el programa y sólo descarga `SistemaPAE.exe` de GitHub se
+queda sin él. Para que una persona nueva pueda instalarse con sólo
+"descargar y descomprimir", se arma un .zip aparte con los dos archivos
+(en PowerShell, ya que `Compress-Archive` no está en Git Bash):
+
+```powershell
+Compress-Archive -Path "dist\SistemaPAE.exe","dist\updater.exe" -DestinationPath "dist\SistemaPAE.zip" -Force
+```
+
+Si `SistemaPAE.exe` está abierto en esta computadora, `Compress-Archive`
+puede fallar con "el proceso no puede tener acceso al archivo" aunque
+`tasklist` no muestre el proceso corriendo (puede ser un antivirus
+escaneándolo un momento) — si pasa, ciérralo, espera unos segundos y
+reintenta.
+
 ## 5. Subir el código a GitHub
 
 Con GitHub Desktop (repositorio: esta misma carpeta,
@@ -61,14 +79,27 @@ En el navegador, en `https://github.com/elliotTorrano/PAEIngresosCelaya`:
 2. En **"Choose a tag"**, escribe `vX.Y.Z` (el mismo número que usaste en el
    paso 2) y elige "Create new tag ... on publish".
 3. En **"Release title"** pon `vX.Y.Z`.
-4. Arrastra a la caja de archivos el `SistemaPAE.exe` que acabas de compilar,
-   desde `dist/SistemaPAE.exe`. **El nombre debe quedar exactamente
-   `SistemaPAE.exe`** — si tiene otro nombre, el programa no lo reconoce.
+4. Arrastra a la caja de archivos **dos** cosas: `dist/SistemaPAE.exe` (el
+   nombre debe quedar exactamente **`SistemaPAE.exe`** — si tiene otro
+   nombre, el programa no lo reconoce para autoactualizarse) y
+   `dist/SistemaPAE.zip` (el paso 4.1 de arriba — para quien instale por
+   primera vez).
 5. Clic en **"Publish release"**.
 
-**No hace falta subir `updater.exe`** al Release — ya viaja dentro de cada
-instalación desde la versión 0.6.0 y es lo que hace el reemplazo del lado
-del usuario.
+**`updater.exe` suelto no se sube** al Release — sólo va dentro del .zip.
+Ya viaja dentro de cada instalación desde la versión 0.6.0 y es lo que hace
+el reemplazo del lado del usuario; el mecanismo de autoactualización sólo
+usa el `SistemaPAE.exe` suelto, nunca el .zip.
+
+### A quién mandarle qué
+
+- **Alguien que YA tiene el programa instalado (0.6.0+)**: no le mandes
+  nada — se actualiza solo la próxima vez que inicie sesión.
+- **Alguien nuevo, sin el programa todavía**: mándale el vínculo del
+  Release y dile que descargue **`SistemaPAE.zip`** (no el `.exe` suelto,
+  y tampoco los "Source code (zip/tar.gz)" que GitHub agrega solo —
+  ésos son el código fuente, no sirven para instalar) y lo descomprima en
+  una carpeta cualquiera.
 
 ## Listo
 
