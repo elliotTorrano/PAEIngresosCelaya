@@ -47,7 +47,9 @@ def test_list_batches_counts_captured_rows(db):
     )
     rows = req_repo.list_rows(batch_id)
     req_repo.update_row_capture(
-        rows[0].id, fecha_notificacion="01/01/2026", quien_recibe="EN PUERTA", quien_recibe_nombre=None
+        rows[0].id,
+        fecha_citatorio="01/01/2026", recibe_citatorio="EN PUERTA", recibe_citatorio_nombre=None,
+        fecha_notificacion="01/01/2026", quien_recibe="EN PUERTA", quien_recibe_nombre=None,
     )
 
     batches = audit_repo.list_batches(get_connection())

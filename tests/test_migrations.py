@@ -113,6 +113,77 @@ def test_migration_creates_backup_before_altering(tmp_path, monkeypatch):
         connection_module._connection = None
 
 
+def test_migration_v3_adds_citatorio_columns_and_revision_rows_table(tmp_path, monkeypatch):
+    db_file = tmp_path / "v2.db"
+    monkeypatch.setattr(connection_module, "db_path", lambda: db_file)
+    connection_module._connection = None
+
+    # Simula una base creada con el esquema v2: requerimiento_rows en su forma
+    # ANTERIOR (sin las columnas de citatorio), y sin la tabla revision_rows.
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+    conn.execute("INSERT INTO schema_version (version) VALUES (2)")
+    conn.execute(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL, full_name TEXT NOT NULL, email TEXT, auth_type TEXT NOT NULL,
+            password_hash TEXT, password_salt TEXT, cert_public_pem TEXT, cert_serial TEXT,
+            must_change_password INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE requerimiento_batches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, abogado_id INTEGER NOT NULL, agente_id INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'PENDIENTE_ABOGADO',
+            exported_agente_path TEXT, exported_abogado_path TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE requerimiento_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id INTEGER NOT NULL,
+            folio TEXT, cta_predial TEXT, contribuyente TEXT, domicilio TEXT,
+            fecha_notificacion TEXT, quien_recibe TEXT, quien_recibe_nombre TEXT, captured_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO requerimiento_batches (id, abogado_id, agente_id) VALUES (1, 1, 1)"
+    )
+    conn.execute(
+        "INSERT INTO requerimiento_rows (batch_id, folio) VALUES (1, 'F-001')"
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        ensure_schema()
+
+        conn = connection_module.get_connection()
+        columns = [row["name"] for row in conn.execute("PRAGMA table_info(requerimiento_rows)")]
+        assert "fecha_citatorio" in columns
+        assert "recibe_citatorio" in columns
+        assert "recibe_citatorio_nombre" in columns
+
+        # El dato preexistente se conserva.
+        row = conn.execute("SELECT folio FROM requerimiento_rows WHERE batch_id = 1").fetchone()
+        assert row["folio"] == "F-001"
+
+        tables = [r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        assert "revision_rows" in tables
+
+        version = conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+        assert version == CURRENT_VERSION
+    finally:
+        connection_module._connection = None
+
+
 def test_fresh_schema_already_has_column(tmp_path, monkeypatch):
     db_file = tmp_path / "fresh.db"
     monkeypatch.setattr(connection_module, "db_path", lambda: db_file)

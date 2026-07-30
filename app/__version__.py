@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.7.1"
+__version__ = "0.8.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -64,4 +64,14 @@ VERSION_NOTES = {
               "volver a escribir el usuario. Corrección adicional al redimensionado: la "
               "hoja de estilos ya no se aplica directamente sobre la ventana principal "
               "(causa más probable de que sólo se pudiera ajustar a lo ancho).",
+    "0.8.0": "Corregido un bug de arranque en el login (Enter disparaba, en segundo "
+              "plano, la acción de una página oculta -- por eso a veces mandaba a "
+              "'Olvidé mi contraseña' sin haberlo pedido). El Abogado captura ahora dos "
+              "eventos separados: Fecha/Recibe de CITATORIO y Fecha/Quién recibe de "
+              "NOTIFICACIÓN. El archivo que el Agente exporta para el Abogado se llama "
+              "'LISTA DEL {fecha} {abogado}'. Nuevo: el Agente puede importar la captura "
+              "que el Abogado exportó y marcar PROCEDE/NO PROCEDE por fila, con su propia "
+              "exportación. Nuevo menú 'Histórico' (Agente y Abogado) con los archivos que "
+              "han cargado. La exportación del Abogado agrega 'ENTREGA {fecha}' al nombre "
+              "y ofrece enviarla por correo al Agente del lote, o sólo exportarla.",
 }

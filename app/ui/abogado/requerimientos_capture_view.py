@@ -1,12 +1,14 @@
 """Abogado: importa el archivo del Agente del PAE, captura el citatorio y exporta.
 
 El Abogado nunca edita FOLIO/CTA PREDIAL/CONTRIBUYENTE/DOMICILIO (se muestran de
-sólo lectura); únicamente captura "Fecha de Notificación de citatorio" y
-"Quién recibe el citatorio".
+sólo lectura); captura dos pares de datos, cada uno con su propia fecha y
+"quién recibe": la fecha/quién del citatorio en sí, y la fecha/quién de la
+notificación de ese citatorio (dos eventos distintos).
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QDate, QTimer
@@ -30,6 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.auth.recovery import open_email_client
 from app.config import BATCH_STATUS_EXPORTADO, QUIEN_RECIBE_EN_PUERTA, QUIEN_RECIBE_NOMBRE, ROLE_AGENTE_PAE
 from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import users as users_repo
@@ -37,8 +40,16 @@ from app.excel_io.requerimientos_export import export_captured
 from app.excel_io.requerimientos_import import parse_agente_export_file
 from app.utils.paths import exports_dir
 
-COL_FOLIO, COL_CTA, COL_CONTRIB, COL_DOM, COL_FECHA, COL_QUIEN, COL_NOMBRE = range(7)
-HEADERS = ["FOLIO", "CTA PREDIAL", "CONTRIBUYENTE", "DOMICILIO", "Fecha de notificación", "Quién recibe", "Nombre"]
+(
+    COL_FOLIO, COL_CTA, COL_CONTRIB, COL_DOM,
+    COL_FECHA_CIT, COL_RECIBE_CIT, COL_NOMBRE_CIT,
+    COL_FECHA_NOT, COL_QUIEN_NOT, COL_NOMBRE_NOT,
+) = range(10)
+HEADERS = [
+    "FOLIO", "CTA PREDIAL", "CONTRIBUYENTE", "DOMICILIO",
+    "Fecha de citatorio", "Recibe citatorio", "Nombre",
+    "Fecha de notificación", "Quién recibe", "Nombre",
+]
 
 HIGHLIGHT_COLOR = QColor("#ffe08a")
 
@@ -168,34 +179,51 @@ class RequerimientosCaptureView(QWidget):
             self.table.setItem(r, COL_CONTRIB, QTableWidgetItem(row.contribuyente or ""))
             self.table.setItem(r, COL_DOM, QTableWidgetItem(row.domicilio or ""))
 
-            date_edit = QDateEdit()
-            date_edit.setCalendarPopup(True)
-            date_edit.setDisplayFormat("dd/MM/yyyy")
-            if row.fecha_notificacion:
-                date_edit.setDate(QDate.fromString(row.fecha_notificacion, "dd/MM/yyyy"))
-            else:
-                date_edit.setDate(QDate.currentDate())
-            date_edit.dateChanged.connect(lambda _d, row_id=row.id: self._save_row(row_id))
-            self.table.setCellWidget(r, COL_FECHA, date_edit)
-
-            quien_combo = QComboBox()
-            quien_combo.addItem("", "")
-            quien_combo.addItem(QUIEN_RECIBE_EN_PUERTA, QUIEN_RECIBE_EN_PUERTA)
-            quien_combo.addItem(QUIEN_RECIBE_NOMBRE, QUIEN_RECIBE_NOMBRE)
-            if row.quien_recibe:
-                quien_combo.setCurrentIndex(quien_combo.findData(row.quien_recibe))
-            self.table.setCellWidget(r, COL_QUIEN, quien_combo)
-
-            nombre_edit = QLineEdit(row.quien_recibe_nombre or "")
-            nombre_edit.setEnabled(row.quien_recibe == QUIEN_RECIBE_NOMBRE)
-            self.table.setCellWidget(r, COL_NOMBRE, nombre_edit)
-
-            quien_combo.currentIndexChanged.connect(
-                lambda _i, row_id=row.id, combo=quien_combo, name_edit=nombre_edit: self._on_quien_changed(
-                    row_id, combo, name_edit
-                )
+            self._build_capture_trio(
+                r, row.id,
+                date_col=COL_FECHA_CIT, combo_col=COL_RECIBE_CIT, name_col=COL_NOMBRE_CIT,
+                fecha_value=row.fecha_citatorio, quien_value=row.recibe_citatorio,
+                nombre_value=row.recibe_citatorio_nombre,
             )
-            nombre_edit.textChanged.connect(lambda text, row_id=row.id, edit=nombre_edit: self._on_nombre_changed(row_id, text, edit))
+            self._build_capture_trio(
+                r, row.id,
+                date_col=COL_FECHA_NOT, combo_col=COL_QUIEN_NOT, name_col=COL_NOMBRE_NOT,
+                fecha_value=row.fecha_notificacion, quien_value=row.quien_recibe,
+                nombre_value=row.quien_recibe_nombre,
+            )
+
+    def _build_capture_trio(
+        self, table_row: int, row_id: int, *, date_col: int, combo_col: int, name_col: int,
+        fecha_value: str | None, quien_value: str | None, nombre_value: str | None,
+    ) -> None:
+        date_edit = QDateEdit()
+        date_edit.setCalendarPopup(True)
+        date_edit.setDisplayFormat("dd/MM/yyyy")
+        if fecha_value:
+            date_edit.setDate(QDate.fromString(fecha_value, "dd/MM/yyyy"))
+        else:
+            date_edit.setDate(QDate.currentDate())
+        date_edit.dateChanged.connect(lambda _d, rid=row_id: self._save_row(rid))
+        self.table.setCellWidget(table_row, date_col, date_edit)
+
+        quien_combo = QComboBox()
+        quien_combo.addItem("", "")
+        quien_combo.addItem(QUIEN_RECIBE_EN_PUERTA, QUIEN_RECIBE_EN_PUERTA)
+        quien_combo.addItem(QUIEN_RECIBE_NOMBRE, QUIEN_RECIBE_NOMBRE)
+        if quien_value:
+            quien_combo.setCurrentIndex(quien_combo.findData(quien_value))
+        self.table.setCellWidget(table_row, combo_col, quien_combo)
+
+        nombre_edit = QLineEdit(nombre_value or "")
+        nombre_edit.setEnabled(quien_value == QUIEN_RECIBE_NOMBRE)
+        self.table.setCellWidget(table_row, name_col, nombre_edit)
+
+        quien_combo.currentIndexChanged.connect(
+            lambda _i, rid=row_id, combo=quien_combo, name_edit=nombre_edit: self._on_quien_changed(
+                rid, combo, name_edit
+            )
+        )
+        nombre_edit.textChanged.connect(lambda text, rid=row_id, edit=nombre_edit: self._on_nombre_changed(rid, text, edit))
 
     def _on_quien_changed(self, row_id: int, combo: QComboBox, name_edit: QLineEdit) -> None:
         value = combo.currentData()
@@ -219,27 +247,44 @@ class RequerimientosCaptureView(QWidget):
         if table_row is None:
             return
 
-        date_edit: QDateEdit = self.table.cellWidget(table_row, COL_FECHA)
-        quien_combo: QComboBox = self.table.cellWidget(table_row, COL_QUIEN)
-        nombre_edit: QLineEdit = self.table.cellWidget(table_row, COL_NOMBRE)
-
-        quien_value = quien_combo.currentData() or None
-        fecha_value = date_edit.date().toString("dd/MM/yyyy") if quien_value else None
+        fecha_citatorio, recibe_citatorio, recibe_citatorio_nombre = self._read_capture_trio(
+            table_row, date_col=COL_FECHA_CIT, combo_col=COL_RECIBE_CIT, name_col=COL_NOMBRE_CIT
+        )
+        fecha_notificacion, quien_recibe, quien_recibe_nombre = self._read_capture_trio(
+            table_row, date_col=COL_FECHA_NOT, combo_col=COL_QUIEN_NOT, name_col=COL_NOMBRE_NOT
+        )
 
         if not self.simulate:
             req_repo.update_row_capture(
                 row_id,
-                fecha_notificacion=fecha_value,
-                quien_recibe=quien_value,
-                quien_recibe_nombre=nombre_edit.text().strip() or None
-                if quien_value == QUIEN_RECIBE_NOMBRE else None,
+                fecha_citatorio=fecha_citatorio,
+                recibe_citatorio=recibe_citatorio,
+                recibe_citatorio_nombre=recibe_citatorio_nombre,
+                fecha_notificacion=fecha_notificacion,
+                quien_recibe=quien_recibe,
+                quien_recibe_nombre=quien_recibe_nombre,
             )
         for row in self._rows:
             if row.id == row_id:
-                row.fecha_notificacion = fecha_value
-                row.quien_recibe = quien_value
-                row.quien_recibe_nombre = nombre_edit.text().strip() or None
+                row.fecha_citatorio = fecha_citatorio
+                row.recibe_citatorio = recibe_citatorio
+                row.recibe_citatorio_nombre = recibe_citatorio_nombre
+                row.fecha_notificacion = fecha_notificacion
+                row.quien_recibe = quien_recibe
+                row.quien_recibe_nombre = quien_recibe_nombre
                 break
+
+    def _read_capture_trio(
+        self, table_row: int, *, date_col: int, combo_col: int, name_col: int
+    ) -> tuple[str | None, str | None, str | None]:
+        date_edit: QDateEdit = self.table.cellWidget(table_row, date_col)
+        quien_combo: QComboBox = self.table.cellWidget(table_row, combo_col)
+        nombre_edit: QLineEdit = self.table.cellWidget(table_row, name_col)
+
+        quien_value = quien_combo.currentData() or None
+        fecha_value = date_edit.date().toString("dd/MM/yyyy") if quien_value else None
+        nombre_value = nombre_edit.text().strip() or None if quien_value == QUIEN_RECIBE_NOMBRE else None
+        return fecha_value, quien_value, nombre_value
 
     def _table_row_for_id(self, row_id: int) -> int | None:
         for idx, row in enumerate(self._rows):
@@ -272,6 +317,23 @@ class RequerimientosCaptureView(QWidget):
         QTimer.singleShot(1000, revert)
 
     # --- Exportar ------------------------------------------------------------------------
+    def _ask_export_choice(self) -> str:
+        """Devuelve 'email', 'only' o 'cancel'. Aislado en su propio método para
+        que las pruebas puedan simular la elección sin abrir un diálogo real."""
+        choice_box = QMessageBox(self)
+        choice_box.setWindowTitle("Exportar")
+        choice_box.setText("¿Cómo deseas exportar la captura de este lote?")
+        email_btn = choice_box.addButton("Exportar y enviar por correo", QMessageBox.ButtonRole.AcceptRole)
+        only_btn = choice_box.addButton("Sólo exportar", QMessageBox.ButtonRole.ActionRole)
+        choice_box.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        choice_box.exec()
+        clicked = choice_box.clickedButton()
+        if clicked is email_btn:
+            return "email"
+        if clicked is only_btn:
+            return "only"
+        return "cancel"
+
     def _on_export(self) -> None:
         if self._current_batch_id is None or not self._rows:
             QMessageBox.warning(self, "Nada que exportar", "Seleccione un lote con filas capturadas.")
@@ -285,10 +347,33 @@ class RequerimientosCaptureView(QWidget):
             )
             return
 
-        output_path = exports_dir() / f"requerimientos_capturado_lote{self._current_batch_id}.xlsx"
+        choice = self._ask_export_choice()
+        if choice == "cancel":
+            return
+
+        fecha = datetime.now().strftime("%d_%m_%Y")
+        output_path = exports_dir() / f"requerimientos_capturado_lote{self._current_batch_id} ENTREGA {fecha}.xlsx"
         export_captured(self._rows, output_path)
         req_repo.set_batch_export_path(self._current_batch_id, abogado_path=str(output_path))
         req_repo.set_batch_status(self._current_batch_id, BATCH_STATUS_EXPORTADO)
         self._refresh_batch_list()
 
-        QMessageBox.information(self, "Exportado", f"Archivo exportado:\n{output_path}")
+        if choice == "email":
+            batch = req_repo.get_batch(self._current_batch_id)
+            agente = users_repo.get_by_id(batch["agente_id"]) if batch else None
+            if agente is not None and agente.email:
+                open_email_client(
+                    to_email=agente.email,
+                    subject="Entrega de Requerimientos capturados",
+                    body=f"Se adjunta la captura del lote #{self._current_batch_id}.",
+                    attachment_path=output_path,
+                )
+                QMessageBox.information(self, "Exportado", f"Archivo exportado y correo abierto:\n{output_path}")
+            else:
+                QMessageBox.warning(
+                    self, "Sin correo del Agente",
+                    "El archivo se exportó, pero el Agente del PAE de este lote no tiene correo "
+                    f"registrado, así que no se pudo abrir el correo:\n{output_path}",
+                )
+        else:
+            QMessageBox.information(self, "Exportado", f"Archivo exportado:\n{output_path}")

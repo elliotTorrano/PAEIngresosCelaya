@@ -45,16 +45,38 @@ CREATE TABLE IF NOT EXISTS requerimiento_batches (
 );
 
 CREATE TABLE IF NOT EXISTS requerimiento_rows (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    batch_id            INTEGER NOT NULL REFERENCES requerimiento_batches(id),
-    folio               TEXT,
-    cta_predial         TEXT,
-    contribuyente       TEXT,
-    domicilio           TEXT,
-    fecha_notificacion  TEXT,
-    quien_recibe        TEXT CHECK (quien_recibe IN ('EN PUERTA', 'NOMBRE')),
-    quien_recibe_nombre TEXT,
-    captured_at         TEXT
+    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_id                 INTEGER NOT NULL REFERENCES requerimiento_batches(id),
+    folio                    TEXT,
+    cta_predial              TEXT,
+    contribuyente            TEXT,
+    domicilio                TEXT,
+    fecha_citatorio          TEXT,
+    recibe_citatorio         TEXT CHECK (recibe_citatorio IN ('EN PUERTA', 'NOMBRE')),
+    recibe_citatorio_nombre  TEXT,
+    fecha_notificacion       TEXT,
+    quien_recibe             TEXT CHECK (quien_recibe IN ('EN PUERTA', 'NOMBRE')),
+    quien_recibe_nombre      TEXT,
+    captured_at              TEXT
+);
+
+CREATE TABLE IF NOT EXISTS revision_rows (
+    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+    agente_id                INTEGER NOT NULL REFERENCES users(id),
+    source_filename          TEXT NOT NULL,
+    abogado_nombre           TEXT,
+    folio                    TEXT,
+    cta_predial              TEXT,
+    contribuyente            TEXT,
+    domicilio                TEXT,
+    fecha_citatorio          TEXT,
+    recibe_citatorio         TEXT,
+    recibe_citatorio_nombre  TEXT,
+    fecha_notificacion       TEXT,
+    quien_recibe             TEXT,
+    quien_recibe_nombre      TEXT,
+    procede                  TEXT CHECK (procede IN ('PROCEDE', 'NO PROCEDE')),
+    imported_at              TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS app_settings (
@@ -76,3 +98,4 @@ CREATE TABLE IF NOT EXISTS reset_requests (
 CREATE INDEX IF NOT EXISTS idx_imported_files_agente ON imported_files(agente_id, original_filename);
 CREATE INDEX IF NOT EXISTS idx_batches_abogado ON requerimiento_batches(abogado_id);
 CREATE INDEX IF NOT EXISTS idx_rows_batch ON requerimiento_rows(batch_id);
+CREATE INDEX IF NOT EXISTS idx_revision_rows_agente ON revision_rows(agente_id);

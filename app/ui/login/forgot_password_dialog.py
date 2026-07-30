@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.auth import recovery
-from app.config import RESET_REASON_LABELS
+from app.config import ADMIN_NOTIFICATION_EMAIL_SUBJECT, RESET_REASON_LABELS
 from app.db.repositories import users as users_repo
 from app.utils.paths import reset_requests_dir
 
@@ -90,7 +90,9 @@ class ForgotPasswordDialog(QDialog):
             f"Detalle: {payload['detail'] or '(sin detalle)'}\n\n"
             f"Se adjunta el archivo de solicitud generado por el sistema."
         )
-        attached = recovery.open_email_client(to_email=admin.email, body=body, attachment_path=request_path)
+        attached = recovery.open_email_client(
+            to_email=admin.email, subject=ADMIN_NOTIFICATION_EMAIL_SUBJECT, body=body, attachment_path=request_path
+        )
 
         if attached:
             note = "Se abrió Outlook con el archivo ya adjunto. Revise y presione Enviar."

@@ -85,6 +85,15 @@ def test_otros_menu_shows_datos_cuenta_tab(qapp, db):
     assert _tab_titles(window).count("Datos de cuenta") == 1
 
 
+def test_historico_menu_shows_and_reuses_tab(qapp, db):
+    window = MainWindow(_make_agente())
+
+    window._show_historico_tab()
+    assert "Histórico" in _tab_titles(window)
+    window._show_historico_tab()
+    assert _tab_titles(window).count("Histórico") == 1
+
+
 def test_admin_keeps_direct_requerimientos_tab_plus_welcome(qapp, db):
     window = MainWindow(_make_admin())
 

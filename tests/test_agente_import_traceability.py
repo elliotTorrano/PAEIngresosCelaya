@@ -1,3 +1,4 @@
+from datetime import datetime
 from unittest.mock import patch
 
 import openpyxl
@@ -92,3 +93,25 @@ def test_reusing_same_filename_in_a_new_batch_is_not_blocked(qapp, db, tmp_path)
     assert len(rows) == 2  # ambas subidas quedaron en el histórico
     assert rows[0]["batch_id"] is not None  # la primera sí quedó ligada a su lote exportado
     assert rows[1]["batch_id"] is None  # la segunda todavía no se exporta
+
+
+def test_export_filename_follows_lista_del_convention(qapp, db, tmp_path):
+    from app.utils.paths import exports_dir
+
+    agente = _make_agente_abogado()
+    path = tmp_path / "lote.xlsx"
+    _write_valid_file(path)
+
+    view = RequerimientosImportView(agente)
+    with patch(
+        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        return_value=([str(path)], ""),
+    ):
+        view._on_select_files()
+
+    with patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+        view._on_export()
+
+    fecha = datetime.now().strftime("%d_%m_%Y")
+    expected = exports_dir() / f"LISTA DEL {fecha} Abogado Uno.xlsx"
+    assert expected.exists()

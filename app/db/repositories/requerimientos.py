@@ -17,6 +17,9 @@ class RequerimientoRow:
     cta_predial: str | None
     contribuyente: str | None
     domicilio: str | None
+    fecha_citatorio: str | None
+    recibe_citatorio: str | None
+    recibe_citatorio_nombre: str | None
     fecha_notificacion: str | None
     quien_recibe: str | None
     quien_recibe_nombre: str | None
@@ -30,6 +33,9 @@ class RequerimientoRow:
             cta_predial=row["cta_predial"],
             contribuyente=row["contribuyente"],
             domicilio=row["domicilio"],
+            fecha_citatorio=row["fecha_citatorio"],
+            recibe_citatorio=row["recibe_citatorio"],
+            recibe_citatorio_nombre=row["recibe_citatorio_nombre"],
             fecha_notificacion=row["fecha_notificacion"],
             quien_recibe=row["quien_recibe"],
             quien_recibe_nombre=row["quien_recibe_nombre"],
@@ -37,7 +43,10 @@ class RequerimientoRow:
 
     @property
     def is_captured(self) -> bool:
-        return bool(self.fecha_notificacion) and bool(self.quien_recibe)
+        return (
+            bool(self.fecha_citatorio) and bool(self.recibe_citatorio)
+            and bool(self.fecha_notificacion) and bool(self.quien_recibe)
+        )
 
 
 def create_batch(*, abogado_id: int, agente_id: int) -> int:
@@ -122,18 +131,61 @@ def list_rows(batch_id: int) -> list[RequerimientoRow]:
 
 
 def update_row_capture(
-    row_id: int, *, fecha_notificacion: str | None, quien_recibe: str | None, quien_recibe_nombre: str | None
+    row_id: int,
+    *,
+    fecha_citatorio: str | None,
+    recibe_citatorio: str | None,
+    recibe_citatorio_nombre: str | None,
+    fecha_notificacion: str | None,
+    quien_recibe: str | None,
+    quien_recibe_nombre: str | None,
 ) -> None:
     conn = get_connection()
     conn.execute(
         """
         UPDATE requerimiento_rows
-        SET fecha_notificacion = ?, quien_recibe = ?, quien_recibe_nombre = ?, captured_at = datetime('now')
+        SET fecha_citatorio = ?, recibe_citatorio = ?, recibe_citatorio_nombre = ?,
+            fecha_notificacion = ?, quien_recibe = ?, quien_recibe_nombre = ?,
+            captured_at = datetime('now')
         WHERE id = ?
         """,
-        (fecha_notificacion, quien_recibe, quien_recibe_nombre, row_id),
+        (
+            fecha_citatorio, recibe_citatorio, recibe_citatorio_nombre,
+            fecha_notificacion, quien_recibe, quien_recibe_nombre,
+            row_id,
+        ),
     )
     conn.commit()
+
+
+def list_imported_files_for_agente(agente_id: int) -> list[sqlite3.Row]:
+    conn = get_connection()
+    return conn.execute(
+        """
+        SELECT f.id, f.original_filename, f.row_count, f.imported_at,
+               bu.full_name AS abogado_nombre
+        FROM imported_files f
+        LEFT JOIN users bu ON bu.id = f.abogado_id
+        WHERE f.agente_id = ?
+        ORDER BY f.imported_at DESC
+        """,
+        (agente_id,),
+    ).fetchall()
+
+
+def list_imported_files_for_abogado(abogado_id: int) -> list[sqlite3.Row]:
+    conn = get_connection()
+    return conn.execute(
+        """
+        SELECT f.id, f.original_filename, f.row_count, f.imported_at,
+               au.full_name AS agente_nombre
+        FROM imported_files f
+        LEFT JOIN users au ON au.id = f.agente_id
+        WHERE f.abogado_id = ?
+        ORDER BY f.imported_at DESC
+        """,
+        (abogado_id,),
+    ).fetchall()
 
 
 def set_batch_status(batch_id: int, status: str) -> None:

@@ -62,11 +62,12 @@ def register_local_request(payload: dict, request_file_path: Path) -> None:
     )
 
 
-def open_email_client(*, to_email: str, body: str, attachment_path: Path) -> bool:
-    """Abre el correo dirigido al administrador. Devuelve True si el adjunto quedó
-    puesto automáticamente (sólo posible con Outlook vía COM); False si el usuario
-    debe adjuntar el archivo manualmente (mailto: no soporta adjuntos de forma
-    confiable entre distintos clientes de correo)."""
+def open_email_client(*, to_email: str, subject: str, body: str, attachment_path: Path) -> bool:
+    """Abre un correo (dirigido a quien indique el llamador, no sólo al
+    administrador). Devuelve True si el adjunto quedó puesto automáticamente
+    (sólo posible con Outlook vía COM); False si el usuario debe adjuntar el
+    archivo manualmente (mailto: no soporta adjuntos de forma confiable entre
+    distintos clientes de correo)."""
     if sys.platform == "win32":
         try:
             import win32com.client  # type: ignore
@@ -74,7 +75,7 @@ def open_email_client(*, to_email: str, body: str, attachment_path: Path) -> boo
             outlook = win32com.client.Dispatch("Outlook.Application")
             mail = outlook.CreateItem(0)
             mail.To = to_email
-            mail.Subject = ADMIN_NOTIFICATION_EMAIL_SUBJECT
+            mail.Subject = subject
             mail.Body = body
             mail.Attachments.Add(str(attachment_path))
             mail.Display()
@@ -82,7 +83,7 @@ def open_email_client(*, to_email: str, body: str, attachment_path: Path) -> boo
         except Exception:
             pass
 
-    mailto = f"mailto:{to_email}?subject={quote(ADMIN_NOTIFICATION_EMAIL_SUBJECT)}&body={quote(body)}"
+    mailto = f"mailto:{to_email}?subject={quote(subject)}&body={quote(body)}"
     webbrowser.open(mailto)
     return False
 

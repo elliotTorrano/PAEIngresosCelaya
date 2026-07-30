@@ -86,6 +86,7 @@ class MainWindow(QMainWindow):
         if role in (ROLE_AGENTE_PAE, ROLE_ABOGADO):
             self._build_formato_menu()
             self._build_otros_menu()
+            self._build_historico_menu()
 
         if role == ROLE_SUPERUSUARIO:
             self._build_ver_como_menu()
@@ -153,6 +154,23 @@ class MainWindow(QMainWindow):
             widget = SimpleAccountView(self.user)
             self.tabs.addTab(widget, "Datos de cuenta")
             self._otros_widgets["datos_cuenta"] = widget
+        self.tabs.setCurrentWidget(widget)
+
+    # --- Menú "Histórico" (Agente del PAE / Abogado) --------------------------------
+
+    def _build_historico_menu(self) -> None:
+        menu = self.menuBar().addMenu("Histórico")
+        action = menu.addAction("Ver histórico")
+        action.triggered.connect(self._show_historico_tab)
+
+    def _show_historico_tab(self) -> None:
+        widget = self._otros_widgets.get("historico")
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            from app.ui.widgets.historico_view import HistoricoView
+
+            widget = HistoricoView(self.user)
+            self.tabs.addTab(widget, "Histórico")
+            self._otros_widgets["historico"] = widget
         self.tabs.setCurrentWidget(widget)
 
     # --- Menú "Ver como" (sólo Súper-usuario) ---------------------------------------

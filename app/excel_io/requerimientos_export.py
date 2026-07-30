@@ -10,10 +10,14 @@ from app.db.repositories.requerimientos import RequerimientoRow
 
 HEADERS_AGENTE = ["FOLIO", "CTA PREDIAL", "CONTRIBUYENTE", "DOMICILIO"]
 HEADERS_ABOGADO = HEADERS_AGENTE + [
+    "Fecha de citatorio",
+    "Recibe citatorio",
+    "Nombre de quien recibe el citatorio",
     "Fecha de Notificación de citatorio",
     "Quién recibe el citatorio",
-    "Nombre de quien recibe",
+    "Nombre de quien recibe la notificación",
 ]
+HEADERS_REVISION = HEADERS_ABOGADO + ["Procede"]
 
 
 def export_for_abogado(rows: list[dict], output_path: Path) -> None:
@@ -40,9 +44,37 @@ def export_captured(rows: list[RequerimientoRow], output_path: Path) -> None:
                 row.cta_predial,
                 row.contribuyente,
                 row.domicilio,
+                row.fecha_citatorio,
+                row.recibe_citatorio,
+                row.recibe_citatorio_nombre,
                 row.fecha_notificacion,
                 row.quien_recibe,
                 row.quien_recibe_nombre,
+            ]
+        )
+    workbook.save(output_path)
+
+
+def export_revision(rows: list, output_path: Path) -> None:
+    """Exporta la revisión del Agente (captura del Abogado + PROCEDE/NO PROCEDE)."""
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Revisión"
+    sheet.append(HEADERS_REVISION)
+    for row in rows:
+        sheet.append(
+            [
+                row.folio,
+                row.cta_predial,
+                row.contribuyente,
+                row.domicilio,
+                row.fecha_citatorio,
+                row.recibe_citatorio,
+                row.recibe_citatorio_nombre,
+                row.fecha_notificacion,
+                row.quien_recibe,
+                row.quien_recibe_nombre,
+                row.procede,
             ]
         )
     workbook.save(output_path)

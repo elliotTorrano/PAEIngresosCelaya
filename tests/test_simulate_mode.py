@@ -108,7 +108,7 @@ def test_simulated_abogado_capture_does_not_persist(qapp, db):
     view._load_batch(batch_id)
     row_id = view._rows[0].id
 
-    view.table.cellWidget(0, 5).setCurrentIndex(1)  # QUIEN_RECIBE_EN_PUERTA -- dispara _save_row
+    view.table.cellWidget(0, 8).setCurrentIndex(1)  # columna "Quién recibe" (notificación) -- dispara _save_row
 
     assert view._rows[0].quien_recibe is not None  # el estado local sí se actualiza
     persisted = req_repo.list_rows(batch_id)

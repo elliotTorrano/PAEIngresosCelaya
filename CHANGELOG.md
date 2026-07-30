@@ -1,5 +1,36 @@
 # Historial de versiones — Sistema PAE
 
+## 0.8.0
+
+- **Corrección de bug en el login**: las tres pantallas del login (usuario,
+  contraseña, certificado) llamaban cada una `setDefault()` en su propio
+  botón, pero Qt sólo permite UN botón "default" activo por ventana --
+  presionar Enter en cualquier pantalla podía disparar además, en segundo
+  plano, la acción de la pantalla que hubiera quedado "default" al final
+  (a veces mostrando un aviso invisible que dejaba todo bloqueado, otras
+  veces mandando directo a "Olvidé mi contraseña" sin haberlo pedido). Se
+  quitaron esas llamadas -- cada campo ya dispara su acción con Enter y
+  cada botón con clic, sin necesitarlas.
+- **Dos eventos separados en la captura del Abogado**: se agregaron las
+  columnas "Fecha de citatorio" y "Recibe citatorio" (con su nombre si
+  aplica), distintas de "Fecha de notificación" y "Quién recibe" que ya
+  existían -- son dos momentos distintos del mismo trámite.
+- El archivo que el Agente del PAE exporta para el Abogado ahora se llama
+  `LISTA DEL {fecha} {nombre del Abogado}.xlsx`.
+- **Nuevo: revisión del Agente**. En la pantalla del Agente del PAE, un
+  botón "Importar captura del Abogado" lee el Excel que el Abogado
+  exportó y agrega cada fila a una tabla donde el Agente marca PROCEDE o
+  NO PROCEDE; esa tabla se puede exportar aparte (queda lista para la
+  futura fase de Reportes).
+- **Nuevo menú "Histórico"** para Agente del PAE y Abogado: lista, sólo
+  para ellos mismos, los archivos que han cargado en esta computadora,
+  con fecha/hora y quién fue la otra parte (Agente o Abogado según
+  corresponda).
+- La exportación final del Abogado agrega `ENTREGA {fecha}` al nombre del
+  archivo, y antes de exportar pregunta si se quiere enviar por correo al
+  Agente del lote (usando el mismo mecanismo de Outlook/mailto que ya
+  existía) o sólo exportarlo.
+
 ## 0.7.1
 
 - **Pestañas de Formato cerrables**: las pestañas abiertas desde el menú

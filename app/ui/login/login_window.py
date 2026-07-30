@@ -30,6 +30,15 @@ from app.ui.login.import_update_dialog import ImportUpdateDialog
 
 
 class LoginWindow(QDialog):
+    """Nota sobre botones "default": deliberadamente NINGÚN botón usa
+    setDefault()/setAutoDefault(). Qt sólo permite un botón "default" activo
+    por diálogo, sin importar cuál página del QStackedWidget esté visible --
+    con 3 páginas cada una llamando setDefault(True), sólo la última ganaba
+    (la del certificado), y Enter en cualquier otra página disparaba ADEMÁS
+    esa acción oculta (p. ej. "Falta el certificado" en segundo plano),
+    dejando la ventana como congelada. Cada campo ya dispara su acción via
+    returnPressed, y los botones vía clicked -- no hace falta setDefault."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Iniciar sesión — {APP_NAME}")
@@ -65,8 +74,6 @@ class LoginWindow(QDialog):
         layout.addWidget(self.username_input)
 
         continue_btn = QPushButton("Continuar")
-        continue_btn.setDefault(True)
-        continue_btn.setAutoDefault(True)
         continue_btn.clicked.connect(self._on_continue)
         layout.addWidget(continue_btn)
 
@@ -113,8 +120,6 @@ class LoginWindow(QDialog):
         layout.addWidget(self.password_input)
 
         login_btn = QPushButton("Iniciar sesión")
-        login_btn.setDefault(True)
-        login_btn.setAutoDefault(True)
         login_btn.clicked.connect(self._on_login_password)
         layout.addWidget(login_btn)
 
@@ -161,8 +166,6 @@ class LoginWindow(QDialog):
         layout.addWidget(self.cert_password_input)
 
         login_btn = QPushButton("Iniciar sesión")
-        login_btn.setDefault(True)
-        login_btn.setAutoDefault(True)
         login_btn.clicked.connect(self._on_login_cert)
         layout.addWidget(login_btn)
 

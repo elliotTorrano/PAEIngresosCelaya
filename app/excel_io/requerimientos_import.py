@@ -78,6 +78,38 @@ def parse_agente_export_file(path: Path) -> list[dict]:
         workbook.close()
 
 
+def parse_abogado_export_file(path: Path) -> list[dict]:
+    """Lee el archivo que el propio programa exportó con la captura del Abogado
+    (formato propio, mismo criterio que parse_agente_export_file: encabezados
+    en la fila 1, datos desde la fila 2, siempre .xlsx). Incluye las columnas
+    de citatorio y de notificación."""
+    workbook = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    try:
+        sheet = workbook.active
+        rows = []
+        for cell_row in sheet.iter_rows(min_row=2):
+            row = [cell.value for cell in cell_row]
+            if _is_row_empty(row):
+                continue
+            rows.append(
+                {
+                    "folio": _value_text(row, 1),
+                    "cta_predial": _value_text(row, 2),
+                    "contribuyente": _value_text(row, 3),
+                    "domicilio": _value_text(row, 4),
+                    "fecha_citatorio": _value_text(row, 5),
+                    "recibe_citatorio": _value_text(row, 6),
+                    "recibe_citatorio_nombre": _value_text(row, 7),
+                    "fecha_notificacion": _value_text(row, 8),
+                    "quien_recibe": _value_text(row, 9),
+                    "quien_recibe_nombre": _value_text(row, 10),
+                }
+            )
+        return rows
+    finally:
+        workbook.close()
+
+
 def _read_all_row_values(path: Path) -> list[list]:
     """Devuelve todas las filas del archivo como listas de valores planos,
     sin importar si es .xls (xlrd) o .xlsx/.xlsm (openpyxl)."""
