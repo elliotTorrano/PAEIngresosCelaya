@@ -1,4 +1,7 @@
-"""Alta y consulta de cuentas de Agentes del PAE y Abogados (el Administrador es único)."""
+"""Alta y consulta de cuentas de Agentes del PAE y Abogados, y consulta (sólo
+lectura) de la cuenta única del Administrador -- se sigue sembrando
+automáticamente, no se da de alta desde aquí; sus datos de identidad y
+certificado se cambian desde 'Datos de cuenta'."""
 
 from __future__ import annotations
 
@@ -27,8 +30,36 @@ class UserManagementView(QWidget):
         self.admin_user = admin_user
 
         layout = QHBoxLayout(self)
+        layout.addWidget(self._build_administrador_box())
         layout.addWidget(self._build_role_box("Agentes del PAE", ROLE_AGENTE_PAE, with_password=False))
         layout.addWidget(self._build_role_box("Abogados", ROLE_ABOGADO, with_password=True))
+
+    def _build_administrador_box(self) -> QGroupBox:
+        box = QGroupBox("Administrador")
+        layout = QVBoxLayout(box)
+
+        table = QTableWidget(0, 4)
+        table.setHorizontalHeaderLabels(["Usuario", "Nombre", "Correo", "Activo"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        layout.addWidget(table)
+
+        layout.addWidget(
+            QLabel(
+                "Es una cuenta única: no se da de alta desde aquí. Sus datos de "
+                "identidad y certificado se cambian desde 'Datos de cuenta'."
+            )
+        )
+
+        admin = users_repo.get_administrator()
+        if admin is not None:
+            table.insertRow(0)
+            table.setItem(0, 0, QTableWidgetItem(admin.username))
+            table.setItem(0, 1, QTableWidgetItem(admin.full_name))
+            table.setItem(0, 2, QTableWidgetItem(admin.email or ""))
+            table.setItem(0, 3, QTableWidgetItem("Sí" if admin.active else "No"))
+
+        return box
 
     def _build_role_box(self, title: str, role: str, *, with_password: bool) -> QGroupBox:
         box = QGroupBox(title)

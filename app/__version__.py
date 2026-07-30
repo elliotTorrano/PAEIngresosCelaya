@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.10.0"
+__version__ = "0.10.1"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -88,4 +88,8 @@ VERSION_NOTES = {
               "Cada rol con certificado (Súper, Administrador, Agente del PAE) puede "
               "generar uno nuevo por su cuenta desde Datos de cuenta, y el Abogado ya "
               "puede cambiar su propia contraseña ahí mismo.",
+    "0.10.1": "El Súper-usuario y el Administrador ya ven también los datos del "
+              "Administrador en la pantalla 'Usuarios', junto a Agentes del PAE y "
+              "Abogados. Sigue siendo sólo de consulta: es una cuenta única, no se da de "
+              "alta ni se edita desde ahí.",
 }

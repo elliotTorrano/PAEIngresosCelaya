@@ -1,5 +1,14 @@
 # Historial de versiones — Sistema PAE
 
+## 0.10.1
+
+- El Súper-usuario (y el propio Administrador) ahora ven también los datos
+  del Administrador en la pantalla "Usuarios", junto a Agentes del PAE y
+  Abogados (usuario, nombre, correo, activo). Es sólo de consulta: sigue
+  siendo una cuenta única, sembrada automáticamente -- no se da de alta
+  desde ahí, y sus datos de identidad/certificado se siguen cambiando
+  desde "Datos de cuenta".
+
 ## 0.10.0
 
 - **Corrección**: al cambiar el nombre de usuario (o cualquier dato de
