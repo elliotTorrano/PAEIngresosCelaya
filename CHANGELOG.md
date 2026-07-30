@@ -1,5 +1,23 @@
 # Historial de versiones — Sistema PAE
 
+## 0.5.0
+
+- **Soporte para archivos .xls antiguos**: el Agente del PAE ya puede importar
+  archivos de Excel en el formato binario viejo (.xls), además de .xlsx/.xlsm.
+  Internamente se usa `xlrd` para leer .xls y `openpyxl` para .xlsx/.xlsm; la
+  regla de negocio (omitir las primeras 2 filas y la última, columnas B/C/D/F)
+  es la misma para ambos.
+- **Histórico permanente de archivos subidos**: cada archivo que el Agente del
+  PAE selecciona (con filas válidas) queda registrado de inmediato en
+  `imported_files` -- quién lo subió, cuándo y cuántas filas trajo -- sin
+  ninguna restricción de repetición. El mismo archivo puede volver a subirse
+  el mes siguiente, o para corregir algo, sin ningún bloqueo.
+- **El aviso de "archivo duplicado" cambió de alcance**: antes comparaba
+  contra todo el histórico de ese Agente; ahora sólo avisa si el nombre se
+  repite dentro de la selección actual o ya se había agregado al lote que se
+  está preparando en ese momento para el Abogado (antes de exportarlo). Al
+  exportar, esos registros del histórico quedan enlazados al lote exportado.
+
 ## 0.4.1
 
 - **Corrección de bug**: al importar Excel como Agente del PAE, si un archivo

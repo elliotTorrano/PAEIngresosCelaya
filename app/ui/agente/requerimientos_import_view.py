@@ -72,22 +72,24 @@ class RequerimientosImportView(QWidget):
             return
 
         paths = [Path(p) for p in file_paths]
-        duplicates = find_duplicate_filenames(self.agente_user.id, paths)
+        already_in_batch = set(self._source_filenames)
+        duplicates = find_duplicate_filenames(paths, already_in_batch=already_in_batch)
         if duplicates:
             proceed = QMessageBox.question(
                 self, "Archivos duplicados",
-                "Los siguientes archivos ya fueron importados antes (o están repetidos en esta "
-                "selección) y se omitirán:\n\n" + "\n".join(duplicates) + "\n\n¿Continuar con el resto?",
+                "Los siguientes archivos están repetidos en esta selección, o ya se habían "
+                "agregado a este lote antes de exportar, y se omitirán:\n\n"
+                + "\n".join(duplicates) + "\n\n¿Continuar con el resto?",
             )
             if proceed != QMessageBox.StandardButton.Yes:
                 return
 
-        already_seen_this_batch = set(self._source_filenames)
+        abogado_id = self.abogado_combo.currentData()
         failed: list[str] = []
         empty: list[str] = []
 
         for path in paths:
-            if path.name in duplicates or path.name in already_seen_this_batch:
+            if path.name in duplicates or path.name in already_in_batch:
                 continue
 
             try:
@@ -102,7 +104,14 @@ class RequerimientosImportView(QWidget):
 
             self._rows.extend(result.rows)
             self._source_filenames.append(path.name)
-            already_seen_this_batch.add(path.name)
+            already_in_batch.add(path.name)
+
+            # Histórico permanente de subidas: quién, cuándo y cuántas filas.
+            # No se restringe por repetición -- eso sólo aplica al lote en curso.
+            req_repo.record_imported_file(
+                original_filename=path.name, agente_id=self.agente_user.id, abogado_id=abogado_id,
+                row_count=result.row_count,
+            )
 
         self._refresh_preview()
 
@@ -146,11 +155,9 @@ class RequerimientosImportView(QWidget):
 
         batch_id = req_repo.create_batch(abogado_id=abogado_id, agente_id=self.agente_user.id)
         req_repo.add_rows(batch_id, self._rows)
-        for filename in self._source_filenames:
-            req_repo.record_imported_file(
-                original_filename=filename, agente_id=self.agente_user.id, abogado_id=abogado_id,
-                batch_id=batch_id, row_count=len(self._rows),
-            )
+        req_repo.link_imported_files_to_batch(
+            agente_id=self.agente_user.id, filenames=self._source_filenames, batch_id=batch_id
+        )
 
         output_path = exports_dir() / f"requerimientos_{abogado.username}_lote{batch_id}.xlsx"
         export_for_abogado(self._rows, output_path)

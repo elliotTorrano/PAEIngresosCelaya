@@ -63,8 +63,11 @@ def add_rows(batch_id: int, rows: list[dict]) -> None:
 
 
 def record_imported_file(
-    *, original_filename: str, agente_id: int, abogado_id: int, batch_id: int, row_count: int
+    *, original_filename: str, agente_id: int, abogado_id: int, row_count: int, batch_id: int | None = None
 ) -> None:
+    """Registra en el histórico que se subió un archivo (quién, cuándo, cuántas
+    filas). No hay restricción de unicidad: el mismo nombre puede volver a
+    aparecer tantas veces como se vuelva a subir, cada vez con su propia fecha."""
     conn = get_connection()
     conn.execute(
         """
@@ -76,13 +79,25 @@ def record_imported_file(
     conn.commit()
 
 
-def filename_already_imported(agente_id: int, filename: str) -> bool:
+def link_imported_files_to_batch(*, agente_id: int, filenames: list[str], batch_id: int) -> None:
+    """Asocia con `batch_id` el registro de imported_files más reciente (sin
+    lote asignado todavía) de cada nombre de archivo, al momento de exportar."""
     conn = get_connection()
-    row = conn.execute(
-        "SELECT 1 FROM imported_files WHERE agente_id = ? AND original_filename = ?",
-        (agente_id, filename),
-    ).fetchone()
-    return row is not None
+    for filename in filenames:
+        conn.execute(
+            """
+            UPDATE imported_files
+            SET batch_id = ?
+            WHERE id = (
+                SELECT id FROM imported_files
+                WHERE agente_id = ? AND original_filename = ? AND batch_id IS NULL
+                ORDER BY imported_at DESC
+                LIMIT 1
+            )
+            """,
+            (batch_id, agente_id, filename),
+        )
+    conn.commit()
 
 
 def list_batches_for_abogado(abogado_id: int) -> list[sqlite3.Row]:

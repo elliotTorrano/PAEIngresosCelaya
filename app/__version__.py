@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -24,4 +24,9 @@ VERSION_NOTES = {
               "no tiene filas de datos (p. ej. porque no tiene fila final de totales) "
               "o no se pudo leer (formato inválido/.xls antiguo), ahora se muestra un "
               "aviso claro en vez de no hacer nada.",
+    "0.5.0": "El Agente del PAE ya puede importar archivos .xls antiguos, además de "
+              ".xlsx. Cada archivo subido queda registrado de inmediato en el histórico "
+              "(quién, cuándo, cuántas filas), sin límite de repeticiones -- el aviso de "
+              "'archivo duplicado' ahora sólo aplica dentro del lote que se está "
+              "preparando en ese momento para el Abogado, nunca contra el histórico completo.",
 }
