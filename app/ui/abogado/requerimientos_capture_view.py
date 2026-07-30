@@ -44,13 +44,24 @@ HIGHLIGHT_COLOR = QColor("#ffe08a")
 
 
 class RequerimientosCaptureView(QWidget):
-    def __init__(self, abogado_user: users_repo.User, parent=None):
+    def __init__(self, abogado_user: users_repo.User, parent=None, simulate: bool = False):
         super().__init__(parent)
         self.abogado_user = abogado_user
+        self.simulate = simulate
         self._current_batch_id: int | None = None
         self._rows: list[req_repo.RequerimientoRow] = []
 
         layout = QVBoxLayout(self)
+
+        if self.simulate:
+            banner = QLabel(
+                "Modo simulación: puede navegar lotes existentes y probar la captura, pero "
+                "nada de lo que haga aquí se guarda; no se pueden crear lotes nuevos."
+            )
+            banner.setStyleSheet(
+                "background-color: rgba(255, 224, 138, 0.9); padding: 6px; border-radius: 4px;"
+            )
+            layout.addWidget(banner)
 
         import_row = QHBoxLayout()
         import_btn = QPushButton("Importar archivo del Agente del PAE")
@@ -99,6 +110,14 @@ class RequerimientosCaptureView(QWidget):
 
     # --- Importar ------------------------------------------------------------------
     def _on_import(self) -> None:
+        if self.simulate:
+            QMessageBox.information(
+                self, "No disponible en simulación",
+                "En modo simulación no se pueden crear lotes nuevos. Puede navegar los lotes "
+                "existentes de este usuario (lista de la izquierda) y simular su captura.",
+            )
+            return
+
         agentes = users_repo.list_by_role(ROLE_AGENTE_PAE)
         if not agentes:
             QMessageBox.warning(self, "Sin agentes", "No hay Agentes del PAE registrados en esta instalación.")
@@ -207,12 +226,14 @@ class RequerimientosCaptureView(QWidget):
         quien_value = quien_combo.currentData() or None
         fecha_value = date_edit.date().toString("dd/MM/yyyy") if quien_value else None
 
-        req_repo.update_row_capture(
-            row_id,
-            fecha_notificacion=fecha_value,
-            quien_recibe=quien_value,
-            quien_recibe_nombre=nombre_edit.text().strip() or None if quien_value == QUIEN_RECIBE_NOMBRE else None,
-        )
+        if not self.simulate:
+            req_repo.update_row_capture(
+                row_id,
+                fecha_notificacion=fecha_value,
+                quien_recibe=quien_value,
+                quien_recibe_nombre=nombre_edit.text().strip() or None
+                if quien_value == QUIEN_RECIBE_NOMBRE else None,
+            )
         for row in self._rows:
             if row.id == row_id:
                 row.fecha_notificacion = fecha_value
@@ -254,6 +275,14 @@ class RequerimientosCaptureView(QWidget):
     def _on_export(self) -> None:
         if self._current_batch_id is None or not self._rows:
             QMessageBox.warning(self, "Nada que exportar", "Seleccione un lote con filas capturadas.")
+            return
+
+        if self.simulate:
+            QMessageBox.information(
+                self, "Simulación",
+                f"Se habría exportado el lote #{self._current_batch_id}. No se guardó ni "
+                "exportó nada de verdad.",
+            )
             return
 
         output_path = exports_dir() / f"requerimientos_capturado_lote{self._current_batch_id}.xlsx"

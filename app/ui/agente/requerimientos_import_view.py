@@ -28,13 +28,24 @@ from app.utils.paths import exports_dir
 
 
 class RequerimientosImportView(QWidget):
-    def __init__(self, agente_user: users_repo.User, parent=None):
+    def __init__(self, agente_user: users_repo.User, parent=None, simulate: bool = False):
         super().__init__(parent)
         self.agente_user = agente_user
+        self.simulate = simulate
         self._rows: list[dict] = []
         self._source_filenames: list[str] = []
 
         layout = QVBoxLayout(self)
+
+        if self.simulate:
+            banner = QLabel(
+                "Modo simulación: puede probar el flujo completo, pero nada de lo que haga "
+                "aquí se guarda."
+            )
+            banner.setStyleSheet(
+                "background-color: rgba(255, 224, 138, 0.9); padding: 6px; border-radius: 4px;"
+            )
+            layout.addWidget(banner)
 
         abogado_row = QHBoxLayout()
         abogado_row.addWidget(QLabel("Abogado asignado:"))
@@ -106,12 +117,13 @@ class RequerimientosImportView(QWidget):
             self._source_filenames.append(path.name)
             already_in_batch.add(path.name)
 
-            # Histórico permanente de subidas: quién, cuándo y cuántas filas.
-            # No se restringe por repetición -- eso sólo aplica al lote en curso.
-            req_repo.record_imported_file(
-                original_filename=path.name, agente_id=self.agente_user.id, abogado_id=abogado_id,
-                row_count=result.row_count,
-            )
+            if not self.simulate:
+                # Histórico permanente de subidas: quién, cuándo y cuántas filas.
+                # No se restringe por repetición -- eso sólo aplica al lote en curso.
+                req_repo.record_imported_file(
+                    original_filename=path.name, agente_id=self.agente_user.id, abogado_id=abogado_id,
+                    row_count=result.row_count,
+                )
 
         self._refresh_preview()
 
@@ -153,19 +165,26 @@ class RequerimientosImportView(QWidget):
         abogado_id = self.abogado_combo.currentData()
         abogado = users_repo.get_by_id(abogado_id)
 
-        batch_id = req_repo.create_batch(abogado_id=abogado_id, agente_id=self.agente_user.id)
-        req_repo.add_rows(batch_id, self._rows)
-        req_repo.link_imported_files_to_batch(
-            agente_id=self.agente_user.id, filenames=self._source_filenames, batch_id=batch_id
-        )
+        if self.simulate:
+            QMessageBox.information(
+                self, "Simulación",
+                f"Se habrían exportado {len(self._rows)} filas para {abogado.full_name}. "
+                "No se guardó ni exportó nada de verdad.",
+            )
+        else:
+            batch_id = req_repo.create_batch(abogado_id=abogado_id, agente_id=self.agente_user.id)
+            req_repo.add_rows(batch_id, self._rows)
+            req_repo.link_imported_files_to_batch(
+                agente_id=self.agente_user.id, filenames=self._source_filenames, batch_id=batch_id
+            )
 
-        output_path = exports_dir() / f"requerimientos_{abogado.username}_lote{batch_id}.xlsx"
-        export_for_abogado(self._rows, output_path)
-        req_repo.set_batch_export_path(batch_id, agente_path=str(output_path))
+            output_path = exports_dir() / f"requerimientos_{abogado.username}_lote{batch_id}.xlsx"
+            export_for_abogado(self._rows, output_path)
+            req_repo.set_batch_export_path(batch_id, agente_path=str(output_path))
 
-        QMessageBox.information(
-            self, "Exportado", f"Se exportaron {len(self._rows)} filas para {abogado.full_name}:\n{output_path}"
-        )
+            QMessageBox.information(
+                self, "Exportado", f"Se exportaron {len(self._rows)} filas para {abogado.full_name}:\n{output_path}"
+            )
 
         self._rows = []
         self._source_filenames = []

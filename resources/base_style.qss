@@ -1,9 +1,7 @@
 /* Estilo base del Sistema PAE. El Administrador puede añadir color/imagen de fondo
-   adicionales desde la pestaña "Apariencia", que se agregan a continuación de esto. */
-
-QMainWindow, QDialog {
-    background-color: #f4f6f8;
-}
+   adicionales desde la pestaña "Apariencia", que se agregan a continuación de esto.
+   Nota: esta hoja se aplica al centralWidget de cada ventana, nunca a la QMainWindow
+   directamente -- ver apply_window_background() en app/ui/widgets/styles.py. */
 
 QTabWidget::pane {
     background-color: rgba(255, 255, 255, 0.88);

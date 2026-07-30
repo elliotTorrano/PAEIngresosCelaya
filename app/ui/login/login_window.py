@@ -93,6 +93,16 @@ class LoginWindow(QDialog):
         else:
             self.stack.setCurrentIndex(1)
 
+    def _on_back_to_username(self) -> None:
+        self._user = None
+        self._cert_path = None
+        self.password_input.clear()
+        self.cert_password_input.clear()
+        self.cert_path_label.setText("(ninguno seleccionado)")
+        self.username_input.clear()
+        self.stack.setCurrentIndex(0)
+        self.username_input.setFocus()
+
     # --- Página 2: usuario + contraseña (Abogado) -------------------------------
     def _build_password_page(self) -> QWidget:
         page = QWidget()
@@ -107,6 +117,11 @@ class LoginWindow(QDialog):
         login_btn.setAutoDefault(True)
         login_btn.clicked.connect(self._on_login_password)
         layout.addWidget(login_btn)
+
+        back_btn = QPushButton("Regresar")
+        back_btn.setFlat(True)
+        back_btn.clicked.connect(self._on_back_to_username)
+        layout.addWidget(back_btn)
 
         self.password_input.returnPressed.connect(self._on_login_password)
         return page
@@ -150,6 +165,11 @@ class LoginWindow(QDialog):
         login_btn.setAutoDefault(True)
         login_btn.clicked.connect(self._on_login_cert)
         layout.addWidget(login_btn)
+
+        back_btn = QPushButton("Regresar")
+        back_btn.setFlat(True)
+        back_btn.clicked.connect(self._on_back_to_username)
+        layout.addWidget(back_btn)
 
         self.cert_password_input.returnPressed.connect(self._on_login_cert)
         return page

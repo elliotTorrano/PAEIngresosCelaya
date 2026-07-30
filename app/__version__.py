@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -56,4 +56,12 @@ VERSION_NOTES = {
               "botón para cerrar el archivo que se está revisando. Se corrigió que la "
               "ventana principal no se pudiera redimensionar libremente a lo alto tras "
               "iniciar sesión.",
+    "0.7.1": "Las pestañas de Formato de Requerimientos/Mandamientos (Agente del PAE y "
+              "Abogado) ya se pueden cerrar. 'Datos de cuenta' se movió de pestaña fija a "
+              "un nuevo menú 'Otros'. Nuevo menú 'Ver como' para el Súper-usuario: elige un "
+              "Agente del PAE o Abogado y ve su pantalla en modo simulación, sin guardar "
+              "nada de lo que haga ahí. En el login se agregó un botón 'Regresar' para "
+              "volver a escribir el usuario. Corrección adicional al redimensionado: la "
+              "hoja de estilos ya no se aplica directamente sobre la ventana principal "
+              "(causa más probable de que sólo se pudiera ajustar a lo ancho).",
 }

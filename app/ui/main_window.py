@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel, QMainWindow, QMessageBox, QTabWidget, QVBoxLayout
+from PySide6.QtWidgets import QDialog, QLabel, QMainWindow, QMessageBox, QTabBar, QTabWidget, QVBoxLayout, QWidget
 
 from app.__version__ import __version__
 from app.auth import session
@@ -33,10 +33,14 @@ class MainWindow(QMainWindow):
         bg_layout.setContentsMargins(0, 0, 0, 0)
 
         self.tabs = QTabWidget()
+        self.tabs.setTabsClosable(True)
+        self.tabs.tabCloseRequested.connect(self._on_tab_close_requested)
         bg_layout.addWidget(self.tabs)
         self.setCentralWidget(self._background)
 
-        self._formato_tabs: dict[str, int] = {}
+        self._formato_widgets: dict[str, QWidget] = {}
+        self._otros_widgets: dict[str, QWidget] = {}
+        self._viendo_como_widgets: dict[int, QWidget] = {}
         self._build_tabs()
 
         apply_window_background(self)
@@ -47,15 +51,24 @@ class MainWindow(QMainWindow):
         about_action = menu.addAction("Acerca de")
         about_action.triggered.connect(self._on_about)
 
+    # --- Construcción de pestañas -------------------------------------------------
+
+    def _add_permanent_tab(self, widget: QWidget, title: str) -> None:
+        """Pestaña fija que no se puede cerrar (siempre visible mientras dure la sesión)."""
+        index = self.tabs.addTab(widget, title)
+        self.tabs.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, None)
+
     def _build_tabs(self) -> None:
         role = self.user.role
 
-        self.tabs.addTab(WelcomeView(self.user), "Bienvenida")
+        self._add_permanent_tab(WelcomeView(self.user), "Bienvenida")
 
         if role in ROLES_CAN_ACT_AS_AGENTE:
             from app.ui.agente.requerimientos_import_view import RequerimientosImportView
 
-            self.tabs.addTab(RequerimientosImportView(self.user), "Formato de Requerimientos (Agente del PAE)")
+            self._add_permanent_tab(
+                RequerimientosImportView(self.user), "Formato de Requerimientos (Agente del PAE)"
+            )
 
         if role in (ROLE_ADMINISTRADOR, ROLE_SUPERUSUARIO):
             from app.ui.admin.account_settings_view import AccountSettingsView
@@ -64,17 +77,29 @@ class MainWindow(QMainWindow):
             from app.ui.admin.appearance_settings_view import AppearanceSettingsView
             from app.ui.admin.reset_requests_view import ResetRequestsView
 
-            self.tabs.addTab(UserManagementView(self.user), "Usuarios")
-            self.tabs.addTab(ResetRequestsView(self.user), "Solicitudes de reset")
-            self.tabs.addTab(AppearanceSettingsView(self.user), "Apariencia")
-            self.tabs.addTab(AccountSettingsView(self.user), "Datos de cuenta")
-            self.tabs.addTab(AuditView(self.user), "Trazabilidad")
+            self._add_permanent_tab(UserManagementView(self.user), "Usuarios")
+            self._add_permanent_tab(ResetRequestsView(self.user), "Solicitudes de reset")
+            self._add_permanent_tab(AppearanceSettingsView(self.user), "Apariencia")
+            self._add_permanent_tab(AccountSettingsView(self.user), "Datos de cuenta")
+            self._add_permanent_tab(AuditView(self.user), "Trazabilidad")
 
         if role in (ROLE_AGENTE_PAE, ROLE_ABOGADO):
-            from app.ui.widgets.simple_account_view import SimpleAccountView
-
-            self.tabs.addTab(SimpleAccountView(self.user), "Datos de cuenta")
             self._build_formato_menu()
+            self._build_otros_menu()
+
+        if role == ROLE_SUPERUSUARIO:
+            self._build_ver_como_menu()
+
+    def _on_tab_close_requested(self, index: int) -> None:
+        widget = self.tabs.widget(index)
+        self.tabs.removeTab(index)
+        for mapping in (self._formato_widgets, self._otros_widgets, self._viendo_como_widgets):
+            for key, tracked in list(mapping.items()):
+                if tracked is widget:
+                    del mapping[key]
+        widget.deleteLater()
+
+    # --- Menú "Formato" (Agente del PAE / Abogado) ---------------------------------
 
     def _build_formato_menu(self) -> None:
         menu = self.menuBar().addMenu("Formato")
@@ -84,7 +109,8 @@ class MainWindow(QMainWindow):
         mandamientos_action.triggered.connect(self._show_mandamientos_tab)
 
     def _show_requerimientos_tab(self) -> None:
-        if "requerimientos" not in self._formato_tabs:
+        widget = self._formato_widgets.get("requerimientos")
+        if widget is None or self.tabs.indexOf(widget) == -1:
             if self.user.role == ROLE_AGENTE_PAE:
                 from app.ui.agente.requerimientos_import_view import RequerimientosImportView
 
@@ -95,19 +121,68 @@ class MainWindow(QMainWindow):
 
                 widget = RequerimientosCaptureView(self.user)
                 title = "Formato de Requerimientos (Abogado)"
-            self._formato_tabs["requerimientos"] = self.tabs.addTab(widget, title)
-        self.tabs.setCurrentIndex(self._formato_tabs["requerimientos"])
+            self.tabs.addTab(widget, title)
+            self._formato_widgets["requerimientos"] = widget
+        self.tabs.setCurrentWidget(widget)
 
     def _show_mandamientos_tab(self) -> None:
-        if "mandamientos" not in self._formato_tabs:
-            placeholder = QLabel(
+        widget = self._formato_widgets.get("mandamientos")
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            widget = QLabel(
                 "El Formato de Mandamientos y los Reportes de Requerimientos/Mandamientos "
                 "se agregarán en una siguiente fase del programa."
             )
-            placeholder.setWordWrap(True)
-            placeholder.setContentsMargins(16, 16, 16, 16)
-            self._formato_tabs["mandamientos"] = self.tabs.addTab(placeholder, "Mandamientos (próximamente)")
-        self.tabs.setCurrentIndex(self._formato_tabs["mandamientos"])
+            widget.setWordWrap(True)
+            widget.setContentsMargins(16, 16, 16, 16)
+            self.tabs.addTab(widget, "Mandamientos (próximamente)")
+            self._formato_widgets["mandamientos"] = widget
+        self.tabs.setCurrentWidget(widget)
+
+    # --- Menú "Otros" (Agente del PAE / Abogado) ------------------------------------
+
+    def _build_otros_menu(self) -> None:
+        menu = self.menuBar().addMenu("Otros")
+        action = menu.addAction("Datos de cuenta")
+        action.triggered.connect(self._show_datos_cuenta_tab)
+
+    def _show_datos_cuenta_tab(self) -> None:
+        widget = self._otros_widgets.get("datos_cuenta")
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            from app.ui.widgets.simple_account_view import SimpleAccountView
+
+            widget = SimpleAccountView(self.user)
+            self.tabs.addTab(widget, "Datos de cuenta")
+            self._otros_widgets["datos_cuenta"] = widget
+        self.tabs.setCurrentWidget(widget)
+
+    # --- Menú "Ver como" (sólo Súper-usuario) ---------------------------------------
+
+    def _build_ver_como_menu(self) -> None:
+        menu = self.menuBar().addMenu("Ver como")
+        action = menu.addAction("Elegir agente o abogado...")
+        action.triggered.connect(self._on_choose_view_as)
+
+    def _on_choose_view_as(self) -> None:
+        from app.ui.widgets.choose_user_dialog import ChooseUserDialog
+
+        dialog = ChooseUserDialog(parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted or dialog.selected_user is None:
+            return
+
+        target = dialog.selected_user
+        widget = self._viendo_como_widgets.get(target.id)
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            if target.role == ROLE_AGENTE_PAE:
+                from app.ui.agente.requerimientos_import_view import RequerimientosImportView
+
+                widget = RequerimientosImportView(target, simulate=True)
+            else:
+                from app.ui.abogado.requerimientos_capture_view import RequerimientosCaptureView
+
+                widget = RequerimientosCaptureView(target, simulate=True)
+            self.tabs.addTab(widget, f"Viendo como: {target.full_name}")
+            self._viendo_como_widgets[target.id] = widget
+        self.tabs.setCurrentWidget(widget)
 
     def _on_logout(self) -> None:
         session.end()

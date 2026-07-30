@@ -1,5 +1,33 @@
 # Historial de versiones — Sistema PAE
 
+## 0.7.1
+
+- **Pestañas de Formato cerrables**: las pestañas abiertas desde el menú
+  "Formato" (Requerimientos/Mandamientos) para Agente del PAE y Abogado ya
+  se pueden cerrar con la "x"; se pueden volver a abrir después desde el
+  mismo menú. Las pestañas fijas (Bienvenida, y las de Administrador/Súper)
+  no tienen botón de cerrar.
+- **"Datos de cuenta" se movió a un menú nuevo llamado "Otros"** (Agente del
+  PAE y Abogado): ya no ocupa una pestaña fija; se abre bajo demanda desde
+  ese menú, igual que "Formato".
+- **Nuevo menú "Ver como" (sólo Súper-usuario)**: permite elegir cualquier
+  Agente del PAE o Abogado dado de alta y ver su pantalla dentro de una
+  pestaña nueva ("Viendo como: ..."), en **modo simulación** -- se puede
+  navegar, seleccionar archivos y probar la captura, pero absolutamente
+  nada de lo que se haga ahí se guarda en la base de datos ni se exporta a
+  disco. Sólo los cambios hechos directamente en las pestañas propias del
+  Súper-usuario tienen efecto real.
+- **Login: botón "Regresar"** en las pantallas de contraseña y certificado,
+  para volver a escribir el usuario sin cerrar la ventana de inicio de
+  sesión.
+- **Corrección adicional al redimensionado de la ventana principal**: la
+  hoja de estilos (QSS) ya no se aplica directamente sobre la QMainWindow,
+  sino sobre su contenido interno -- aplicar un stylesheet directamente a
+  una QMainWindow es una causa conocida de comportamientos raros del marco
+  nativo de la ventana en Windows, y es la explicación más probable de que
+  sólo se pudiera ajustar el ancho y no el alto tras la corrección de la
+  0.7.0.
+
 ## 0.7.0
 
 - **Pantalla de Bienvenida**: al iniciar sesión, cualquier rol ve ahora una

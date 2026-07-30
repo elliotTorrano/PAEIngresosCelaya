@@ -36,8 +36,16 @@ def apply_app_icon(app: QApplication) -> None:
 def apply_window_background(window: QWidget) -> None:
     """Aplica la hoja de estilos base y actualiza CADA BackgroundWidget que
     cuelgue de `window` (el fondo general de la ventana y, si está presente,
-    el de la pestaña de Bienvenida) con la imagen/color configurados."""
-    window.setStyleSheet(_base_qss())
+    el de la pestaña de Bienvenida) con la imagen/color configurados.
+
+    La hoja de estilos se aplica al centralWidget (no a la QMainWindow en sí):
+    aplicar CUALQUIER stylesheet directamente sobre una QMainWindow es una causa
+    conocida de comportamientos raros del marco nativo en Windows (incluyendo
+    que deje de poder redimensionarse a lo largo con el mouse), aunque la regla
+    en sí sea inofensiva como un simple background-color."""
+    central = window.centralWidget() if hasattr(window, "centralWidget") else None
+    style_target = central if central is not None else window
+    style_target.setStyleSheet(_base_qss())
 
     bg_path = settings_repo.get(settings_repo.KEY_BACKGROUND_PATH)
     bg_color = settings_repo.get(settings_repo.KEY_BACKGROUND_COLOR)
