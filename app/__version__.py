@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -29,4 +29,13 @@ VERSION_NOTES = {
               "(quién, cuándo, cuántas filas), sin límite de repeticiones -- el aviso de "
               "'archivo duplicado' ahora sólo aplica dentro del lote que se está "
               "preparando en ese momento para el Abogado, nunca contra el histórico completo.",
+    "0.5.1": "Corrección importante: la base de datos usaba el modo WAL de SQLite, "
+              "que guarda cambios recientes en archivos adicionales (pae.db-wal, "
+              "pae.db-shm) aparte de pae.db. Como el programa se distribuye copiando "
+              "la carpeta data/ a mano entre computadoras, copiar sólo pae.db (o "
+              "copiar mientras el programa seguía abierto) podía dejar una copia "
+              "con cuentas/contraseñas desactualizadas -- pae.db ahora es siempre "
+              "el único archivo con la verdad completa (modo DELETE); las bases ya "
+              "creadas se convierten automáticamente la primera vez que se abren "
+              "con esta versión.",
 }

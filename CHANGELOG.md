@@ -1,5 +1,27 @@
 # Historial de versiones — Sistema PAE
 
+## 0.5.1
+
+- **Corrección importante de integridad de datos**: la base usaba el modo WAL
+  de SQLite, que guarda los cambios más recientes en archivos adicionales
+  (`pae.db-wal`, `pae.db-shm`) separados de `pae.db`. Como este programa se
+  distribuye copiando la carpeta `data/` a mano entre computadoras, copiar
+  sólo `pae.db` -- o copiar mientras el programa seguía abierto -- podía
+  producir una copia con cuentas, contraseñas o certificados desactualizados,
+  causando errores de "contraseña incorrecta" para todas las cuentas en la
+  máquina destino aunque las credenciales fueran correctas.
+  Ahora se usa el modo DELETE (el predeterminado de SQLite): `pae.db` es
+  siempre el único archivo con la verdad completa en cuanto termina cada
+  operación. Las bases ya creadas en modo WAL se convierten automáticamente
+  la primera vez que se abren con esta versión.
+- Corregido un problema en las pruebas automatizadas del proyecto que dejaba
+  archivos de prueba sueltos dentro de la carpeta del programa.
+
+**Si ya tuviste el problema de "contraseña incorrecta" en una computadora
+nueva**: vuelve a copiar la carpeta `data/` completa desde el equipo
+original (con el programa ya cerrado ahí) hacia la computadora nueva,
+sobrescribiendo lo que haya, y esta vez sí debería quedar consistente.
+
 ## 0.5.0
 
 - **Soporte para archivos .xls antiguos**: el Agente del PAE ya puede importar

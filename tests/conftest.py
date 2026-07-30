@@ -6,13 +6,15 @@ import pytest
 
 from app.db import connection as connection_module
 from app.db.migrations import ensure_schema
+from app.utils import paths as paths_module
 
 
 @pytest.fixture
 def db(tmp_path, monkeypatch):
-    """Base de datos SQLite aislada en un archivo temporal, por prueba."""
-    db_file = tmp_path / "test.db"
-    monkeypatch.setattr(connection_module, "db_path", lambda: db_file)
+    """Base de datos y carpeta de datos aisladas en un directorio temporal, por
+    prueba. Se redirige base_dir() (no sólo db_path) para que exports_dir(),
+    appearance_dir(), etc. tampoco escriban dentro del proyecto real."""
+    monkeypatch.setattr(paths_module, "base_dir", lambda: tmp_path)
     connection_module._connection = None
     ensure_schema()
     yield
