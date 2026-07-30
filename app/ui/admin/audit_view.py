@@ -49,6 +49,10 @@ class AuditView(QWidget):
         import_btn.clicked.connect(self._on_import)
         layout.addWidget(import_btn)
 
+        close_btn = QPushButton("Cerrar archivo")
+        close_btn.clicked.connect(self._on_close)
+        layout.addWidget(close_btn)
+
         self.source_label = QLabel("(ninguna base importada todavía)")
         layout.addWidget(self.source_label)
 
@@ -91,6 +95,11 @@ class AuditView(QWidget):
         self.source_label.setText(f"Mostrando (sólo lectura): {file_path}")
         self._fill_files(files)
         self._fill_batches(batches)
+
+    def _on_close(self) -> None:
+        self.source_label.setText("(ninguna base importada todavía)")
+        self.files_table.setRowCount(0)
+        self.batches_table.setRowCount(0)
 
     def _fill_files(self, rows: list[sqlite3.Row]) -> None:
         self.files_table.setRowCount(0)

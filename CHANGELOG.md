@@ -1,5 +1,34 @@
 # Historial de versiones — Sistema PAE
 
+## 0.7.0
+
+- **Pantalla de Bienvenida**: al iniciar sesión, cualquier rol ve ahora una
+  primera pestaña "Bienvenida" con la imagen de fondo configurada en
+  Apariencia, mostrada completa y centrada, sin deformarse.
+- **Corrección de la imagen de fondo**: antes se estiraba para llenar la
+  ventana sin respetar su proporción (`border-image` de Qt); ahora un
+  widget propio la escala manteniendo el aspecto original, tanto en el
+  fondo general de la ventana como en la pestaña de Bienvenida.
+- **Cajas y pestañas más legibles sobre el fondo**: las cajas de "Datos de
+  cuenta" y el área de las pestañas ya no son casi transparentes -- tienen
+  un fondo blanco semi-opaco para que el texto no se pierda contra la
+  imagen.
+- **Navegación por menú para Agente del PAE y Abogado**: ya no ven la
+  pestaña de "Formato de Requerimientos" abierta todo el tiempo; ahora se
+  accede desde un nuevo menú "Formato" (con "Formato de Requerimientos" y
+  "Mandamientos", éste último sigue pendiente para una fase futura), que
+  la muestra dentro de la misma ventana. Administrador y Súper-usuario no
+  cambian: conservan sus pestañas de siempre.
+- **Datos de cuenta para Agente del PAE y Abogado**: nueva pestaña
+  simplificada donde pueden ver su usuario y nombre, y actualizar
+  únicamente su correo electrónico (sin necesidad de certificado).
+- **Trazabilidad**: se agregó un botón "Cerrar archivo" para limpiar la
+  base de datos importada que se estaba revisando.
+- **Corrección**: la ventana principal no se podía redimensionar
+  libremente a lo alto después de iniciar sesión (causado por la forma en
+  que se aplicaba la imagen de fondo); ya se puede ajustar en cualquier
+  dirección.
+
 ## 0.6.0
 
 - **Autoactualización desde GitHub**: justo después de iniciar sesión (cualquier

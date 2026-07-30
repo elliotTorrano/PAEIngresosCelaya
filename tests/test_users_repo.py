@@ -39,3 +39,17 @@ def test_update_identity_and_clear_certificate(db):
     assert refreshed.full_name == "Administrador Nuevo"
     assert refreshed.email == "nuevo@example.com"
     assert not users_repo.has_certificate(refreshed)
+
+
+def test_update_email_only_changes_email(db):
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_ADMINISTRADOR, full_name="Agente Uno", email="viejo@example.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+
+    users_repo.update_email(agente.id, "nuevo@example.com")
+
+    refreshed = users_repo.get_by_id(agente.id)
+    assert refreshed.email == "nuevo@example.com"
+    assert refreshed.username == "agente1"
+    assert refreshed.full_name == "Agente Uno"

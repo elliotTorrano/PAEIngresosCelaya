@@ -134,6 +134,18 @@ def update_identity(user_id: int, *, username: str, full_name: str, email: str |
     conn.commit()
 
 
+def update_email(user_id: int, email: str | None) -> None:
+    """Cambia sólo el correo -- a diferencia de update_identity, no toca
+    usuario/nombre y no requiere confirmación por certificado, ya que el
+    correo no forma parte de lo firmado en el certificado del usuario."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE users SET email = ?, updated_at = datetime('now') WHERE id = ?",
+        (email, user_id),
+    )
+    conn.commit()
+
+
 def set_active(user_id: int, active: bool) -> None:
     conn = get_connection()
     conn.execute(

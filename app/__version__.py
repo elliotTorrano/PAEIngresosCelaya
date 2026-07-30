@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -46,4 +46,14 @@ VERSION_NOTES = {
               "programa sigue igual que siempre. Las instalaciones anteriores a la "
               "0.6.0 no tienen ese ayudante todavía, así que este primer salto debe "
               "hacerse una vez de forma manual, como antes.",
+    "0.7.0": "Nueva pestaña 'Bienvenida' al iniciar sesión (para todos los roles), con la "
+              "imagen de Apariencia mostrada completa y sin deformarse (antes se estiraba "
+              "sin respetar proporción). Cajas y pestañas ahora tienen un fondo semi-opaco "
+              "para que el texto no se pierda contra la imagen de fondo. El Agente del PAE "
+              "y el Abogado ya no ven la pestaña de Requerimientos siempre abierta: se "
+              "accede desde un nuevo menú 'Formato', y ambos ganan una pestaña simplificada "
+              "de 'Datos de cuenta' para actualizar su correo. En Trazabilidad se agregó un "
+              "botón para cerrar el archivo que se está revisando. Se corrigió que la "
+              "ventana principal no se pudiera redimensionar libremente a lo alto tras "
+              "iniciar sesión.",
 }

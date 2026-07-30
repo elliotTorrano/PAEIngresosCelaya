@@ -8,6 +8,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QWidget
 
 from app.db.repositories import settings as settings_repo
+from app.ui.widgets.background_widget import BackgroundWidget
 from app.utils.paths import resource_dir
 
 BASE_QSS_PATH = None  # se resuelve en tiempo de ejecución vía resource_dir()
@@ -33,16 +34,15 @@ def apply_app_icon(app: QApplication) -> None:
 
 
 def apply_window_background(window: QWidget) -> None:
-    qss = _base_qss()
+    """Aplica la hoja de estilos base y actualiza CADA BackgroundWidget que
+    cuelgue de `window` (el fondo general de la ventana y, si está presente,
+    el de la pestaña de Bienvenida) con la imagen/color configurados."""
+    window.setStyleSheet(_base_qss())
 
     bg_path = settings_repo.get(settings_repo.KEY_BACKGROUND_PATH)
     bg_color = settings_repo.get(settings_repo.KEY_BACKGROUND_COLOR)
+    image_path = Path(bg_path) if bg_path else None
 
-    if bg_path and Path(bg_path).exists():
-        image_url = Path(bg_path).as_posix()
-        qss += f"\n#appBackground {{ border-image: url({image_url}) 0 0 0 0 stretch stretch; }}\n"
-    elif bg_color:
-        qss += f"\n#appBackground {{ background-color: {bg_color}; }}\n"
-
-    window.setObjectName("appBackground")
-    window.setStyleSheet(qss)
+    for bg_widget in window.findChildren(BackgroundWidget):
+        bg_widget.set_image_path(image_path)
+        bg_widget.set_color(bg_color)
