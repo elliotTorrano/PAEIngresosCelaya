@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -81,4 +81,11 @@ VERSION_NOTES = {
               "desde 'Datos de cuenta'. Corregido además que la solicitud de 'Olvidé mi "
               "contraseña o certificado' del propio Administrador se dirigía a sí mismo "
               "(ahora se dirige al Súper-usuario, como respaldo adicional).",
+    "0.10.0": "El certificado anterior ya se borra automáticamente de donde se había "
+              "guardado cuando se genera uno nuevo (antes quedaba huérfano tras cambiar "
+              "de usuario, por ejemplo). Nuevo botón 'Generar después' al generar "
+              "certificado, que cierra la sesión de inmediato en vez de dejarla a medias. "
+              "Cada rol con certificado (Súper, Administrador, Agente del PAE) puede "
+              "generar uno nuevo por su cuenta desde Datos de cuenta, y el Abogado ya "
+              "puede cambiar su propia contraseña ahí mismo.",
 }

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_salt   TEXT,
     cert_public_pem TEXT,
     cert_serial     TEXT,
+    cert_file_path  TEXT,
     recovery_code_hash TEXT,
     recovery_code_salt TEXT,
     must_change_password INTEGER NOT NULL DEFAULT 0,

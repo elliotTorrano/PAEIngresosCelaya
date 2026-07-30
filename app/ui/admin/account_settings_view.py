@@ -114,6 +114,44 @@ class AccountSettingsView(QWidget):
 
         layout.addWidget(
             QLabel(
+                "Certificado: genere uno nuevo cuando quiera (por ejemplo, para moverlo a "
+                "otra USB), sin necesidad de cambiar usuario/nombre/correo. El certificado "
+                "actual queda invalidado de inmediato; se le pedirá generar el nuevo en el "
+                "siguiente inicio de sesión de esa cuenta."
+            )
+        )
+        new_cert_btn = QPushButton("Generar nuevo certificado")
+        layout.addWidget(new_cert_btn)
+
+        def on_generate_new_certificate() -> None:
+            current = users_repo.get_by_id(target_user.id)
+            if not users_repo.has_certificate(current):
+                QMessageBox.warning(
+                    self,
+                    "Sin certificado registrado",
+                    f"'{current.username}' todavía no tiene un certificado generado; debe "
+                    "iniciar sesión con esa cuenta al menos una vez antes de poder generar "
+                    "uno nuevo.",
+                )
+                return
+
+            confirm_dialog = CertificateConfirmDialog(current, parent=self)
+            if confirm_dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+
+            users_repo.clear_certificate(current.id)
+
+            QMessageBox.information(
+                self,
+                "Certificado invalidado",
+                f"Se eliminó el certificado actual de '{current.full_name}'. Deberá generar uno "
+                "nuevo la próxima vez que esa cuenta inicie sesión.",
+            )
+
+        new_cert_btn.clicked.connect(on_generate_new_certificate)
+
+        layout.addWidget(
+            QLabel(
                 "Código de respaldo: permite recuperar el acceso de inmediato si esta "
                 "cuenta pierde o daña su certificado, sin depender de que otra persona "
                 "lo apruebe. Genere uno nuevo si nunca lo ha guardado, o si sospecha que "

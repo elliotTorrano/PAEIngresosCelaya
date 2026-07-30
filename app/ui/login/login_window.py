@@ -222,6 +222,11 @@ class LoginWindow(QDialog):
         dialog = EnrollmentDialog(user, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._finish_login(users_repo.get_by_id(user.id))
+        elif dialog.deferred:
+            # "Generar después": sin certificado no hay con qué continuar
+            # ahora, así que se cierra la sesión de inmediato (el programa
+            # termina limpio; ver el ciclo en app/main.py).
+            self.reject()
         else:
             self.stack.setCurrentIndex(0)
 

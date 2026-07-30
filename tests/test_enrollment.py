@@ -44,6 +44,66 @@ def test_enroll_certificate_no_recovery_code_for_agente(db, tmp_path):
     assert refreshed.recovery_code_hash is None
 
 
+def test_enroll_certificate_records_file_path(db, tmp_path):
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente", email="ag@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    save_path = tmp_path / "agente1.pfx"
+
+    enroll_certificate(agente, password="clave-segura", save_path=save_path)
+
+    refreshed = users_repo.get_by_id(agente.id)
+    assert refreshed.cert_file_path == str(save_path)
+
+
+def test_reenroll_deletes_previous_certificate_file(db, tmp_path):
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente", email="ag@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    first_path = tmp_path / "agente1_old.pfx"
+    enroll_certificate(agente, password="clave-1", save_path=first_path)
+    assert first_path.exists()
+
+    refreshed = users_repo.get_by_id(agente.id)
+    second_path = tmp_path / "agente1_new.pfx"
+    enroll_certificate(refreshed, password="clave-2", save_path=second_path)
+
+    assert not first_path.exists()
+    assert second_path.exists()
+
+
+def test_reenroll_same_path_does_not_delete_new_file(db, tmp_path):
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente", email="ag@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    same_path = tmp_path / "agente1.pfx"
+    enroll_certificate(agente, password="clave-1", save_path=same_path)
+
+    refreshed = users_repo.get_by_id(agente.id)
+    enroll_certificate(refreshed, password="clave-2", save_path=same_path)
+
+    assert same_path.exists()
+
+
+def test_reenroll_missing_previous_file_does_not_raise(db, tmp_path):
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente", email="ag@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    first_path = tmp_path / "agente1_old.pfx"
+    enroll_certificate(agente, password="clave-1", save_path=first_path)
+    first_path.unlink()  # se movió o se borró manualmente antes de reenrolar
+
+    refreshed = users_repo.get_by_id(agente.id)
+    second_path = tmp_path / "agente1_new.pfx"
+    enroll_certificate(refreshed, password="clave-2", save_path=second_path)
+
+    assert second_path.exists()
+
+
 def test_reenroll_rotates_recovery_code(db, tmp_path):
     admin = users_repo.create_user(
         username="admin", role=ROLE_ADMINISTRADOR, full_name="Admin", email="a@a.com",

@@ -1,5 +1,30 @@
 # Historial de versiones — Sistema PAE
 
+## 0.10.0
+
+- **Corrección**: al cambiar el nombre de usuario (o cualquier dato de
+  identidad) del Administrador o del Súper-usuario, el certificado .pfx
+  anterior se quedaba huérfano en la carpeta donde se había guardado (con
+  el nombre de usuario viejo, ya inútil). Ahora el programa recuerda dónde
+  se guardó el certificado vigente de cada cuenta y, al generarse uno
+  nuevo -- por el motivo que sea -- borra automáticamente el archivo
+  anterior de esa ubicación (si sigue ahí; si ya no está, o no se puede
+  borrar, simplemente se ignora sin interrumpir el proceso). Sólo aplica
+  hacia adelante: certificados ya huérfanos de antes de esta versión no
+  se detectan retroactivamente y deben borrarse a mano.
+- **Nuevo botón "Generar después"** en la pantalla de generar certificado:
+  si en ese momento no se quiere generar uno (primer inicio de sesión, o
+  después de recuperar el acceso), se puede posponer -- el programa cierra
+  la sesión de inmediato en vez de quedar a medias.
+- **Nuevo: cada rol con certificado puede renovar el suyo cuando quiera**,
+  sin depender de nadie más. Súper-usuario y Administrador ya lo tenían
+  implícito al cambiar sus datos; ahora hay un botón directo "Generar
+  nuevo certificado" en Datos de cuenta que no obliga a cambiar
+  usuario/nombre/correo. El Agente del PAE gana el mismo botón en su
+  pantalla de Datos de cuenta.
+- **Nuevo: el Abogado puede cambiar su propia contraseña** desde Datos de
+  cuenta (pide la contraseña actual para confirmar, además de la nueva).
+
 ## 0.9.0
 
 - **Nuevo: código de respaldo para Súper-usuario y Administrador.** Al

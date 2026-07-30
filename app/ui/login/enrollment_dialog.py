@@ -20,9 +20,16 @@ from app.ui.login.recovery_code_dialog import RecoveryCodeDisplayDialog
 
 
 class EnrollmentDialog(QDialog):
+    """Si el usuario cierra este diálogo con "Generar después" (en vez de
+    generar el certificado o cancelar con la X), `self.deferred` queda en
+    True para que el llamador cierre la sesión de inmediato: sin certificado
+    no hay con qué continuar, así que dejarlo a medias no es una opción --
+    o se genera ahora, o se sale y se resuelve más tarde."""
+
     def __init__(self, user: User, parent=None):
         super().__init__(parent)
         self.user = user
+        self.deferred = False
         self.setWindowTitle("Generar certificado de acceso")
         self.setMinimumWidth(420)
 
@@ -49,6 +56,15 @@ class EnrollmentDialog(QDialog):
         generate_btn = QPushButton("Elegir carpeta y generar certificado")
         generate_btn.clicked.connect(self._on_generate)
         layout.addWidget(generate_btn)
+
+        defer_btn = QPushButton("Generar después")
+        defer_btn.setFlat(True)
+        defer_btn.clicked.connect(self._on_defer)
+        layout.addWidget(defer_btn)
+
+    def _on_defer(self) -> None:
+        self.deferred = True
+        self.reject()
 
     def _on_generate(self) -> None:
         password = self.password_input.text()

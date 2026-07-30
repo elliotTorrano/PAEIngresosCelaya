@@ -20,6 +20,7 @@ class User:
     password_salt: str | None
     cert_public_pem: str | None
     cert_serial: str | None
+    cert_file_path: str | None
     recovery_code_hash: str | None
     recovery_code_salt: str | None
     must_change_password: bool
@@ -38,6 +39,7 @@ class User:
             password_salt=row["password_salt"],
             cert_public_pem=row["cert_public_pem"],
             cert_serial=row["cert_serial"],
+            cert_file_path=row["cert_file_path"],
             recovery_code_hash=row["recovery_code_hash"],
             recovery_code_salt=row["recovery_code_salt"],
             must_change_password=bool(row["must_change_password"]),
@@ -97,15 +99,18 @@ def create_user(
     return get_by_id(cur.lastrowid)  # type: ignore[return-value]
 
 
-def set_certificate(user_id: int, *, cert_public_pem: str, cert_serial: str) -> None:
+def set_certificate(user_id: int, *, cert_public_pem: str, cert_serial: str, cert_file_path: str | None = None) -> None:
+    """`cert_file_path` es la última ruta local conocida del archivo .pfx
+    (dónde se guardó al generarlo), para poder borrar automáticamente el
+    certificado anterior la próxima vez que se genere uno nuevo."""
     conn = get_connection()
     conn.execute(
         """
         UPDATE users
-        SET cert_public_pem = ?, cert_serial = ?, updated_at = datetime('now')
+        SET cert_public_pem = ?, cert_serial = ?, cert_file_path = ?, updated_at = datetime('now')
         WHERE id = ?
         """,
-        (cert_public_pem, cert_serial, user_id),
+        (cert_public_pem, cert_serial, cert_file_path, user_id),
     )
     conn.commit()
 

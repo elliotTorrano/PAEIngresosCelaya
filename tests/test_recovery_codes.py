@@ -12,7 +12,7 @@ def _make_user(recovery_code_hash=None, recovery_code_salt=None):
     return User(
         id=1, username="admin", role=ROLE_ADMINISTRADOR, full_name="Admin", email="a@a.com",
         auth_type=AUTH_TYPE_CERTIFICADO, password_hash=None, password_salt=None,
-        cert_public_pem=None, cert_serial=None,
+        cert_public_pem=None, cert_serial=None, cert_file_path=None,
         recovery_code_hash=recovery_code_hash, recovery_code_salt=recovery_code_salt,
         must_change_password=False, active=True,
     )

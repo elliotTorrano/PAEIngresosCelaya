@@ -227,6 +227,49 @@ def test_migration_v4_adds_recovery_code_columns(tmp_path, monkeypatch):
         connection_module._connection = None
 
 
+def test_migration_v5_adds_cert_file_path_column(tmp_path, monkeypatch):
+    db_file = tmp_path / "v4.db"
+    monkeypatch.setattr(connection_module, "db_path", lambda: db_file)
+    connection_module._connection = None
+
+    # Simula una base creada con el esquema v4: users sin cert_file_path.
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+    conn.execute("INSERT INTO schema_version (version) VALUES (4)")
+    conn.execute(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL, full_name TEXT NOT NULL, email TEXT, auth_type TEXT NOT NULL,
+            password_hash TEXT, password_salt TEXT, cert_public_pem TEXT, cert_serial TEXT,
+            recovery_code_hash TEXT, recovery_code_salt TEXT,
+            must_change_password INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO users (username, role, full_name, auth_type) VALUES ('admin', 'ADMINISTRADOR', 'Admin', 'CERTIFICADO')"
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        ensure_schema()
+
+        conn = connection_module.get_connection()
+        columns = [row["name"] for row in conn.execute("PRAGMA table_info(users)")]
+        assert "cert_file_path" in columns
+
+        row = conn.execute("SELECT full_name FROM users WHERE username = 'admin'").fetchone()
+        assert row["full_name"] == "Admin"
+
+        version = conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+        assert version == CURRENT_VERSION
+    finally:
+        connection_module._connection = None
+
+
 def test_fresh_schema_already_has_column(tmp_path, monkeypatch):
     db_file = tmp_path / "fresh.db"
     monkeypatch.setattr(connection_module, "db_path", lambda: db_file)
