@@ -19,8 +19,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.auth.recovery_codes import generate_recovery_code, hash_recovery_code
 from app.config import ROLE_SUPERUSUARIO
 from app.db.repositories import users as users_repo
+from app.ui.login.recovery_code_dialog import RecoveryCodeDisplayDialog
 from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
 
 
@@ -109,4 +111,40 @@ class AccountSettingsView(QWidget):
             )
 
         save_btn.clicked.connect(on_save)
+
+        layout.addWidget(
+            QLabel(
+                "Código de respaldo: permite recuperar el acceso de inmediato si esta "
+                "cuenta pierde o daña su certificado, sin depender de que otra persona "
+                "lo apruebe. Genere uno nuevo si nunca lo ha guardado, o si sospecha que "
+                "el anterior quedó expuesto (invalida el que ya existía)."
+            )
+        )
+        recovery_btn = QPushButton("Generar nuevo código de respaldo")
+        layout.addWidget(recovery_btn)
+
+        def on_generate_recovery_code() -> None:
+            current = users_repo.get_by_id(target_user.id)
+            if not users_repo.has_certificate(current):
+                QMessageBox.warning(
+                    self,
+                    "Sin certificado registrado",
+                    f"'{current.username}' todavía no tiene un certificado generado; debe "
+                    "iniciar sesión con esa cuenta al menos una vez antes de poder generar "
+                    "un código de respaldo.",
+                )
+                return
+
+            confirm_dialog = CertificateConfirmDialog(current, parent=self)
+            if confirm_dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+
+            code = generate_recovery_code()
+            code_hash, code_salt = hash_recovery_code(code)
+            users_repo.set_recovery_code(current.id, recovery_code_hash=code_hash, recovery_code_salt=code_salt)
+
+            RecoveryCodeDisplayDialog(code, parent=self).exec()
+
+        recovery_btn.clicked.connect(on_generate_recovery_code)
+
         return box

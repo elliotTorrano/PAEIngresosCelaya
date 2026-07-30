@@ -21,12 +21,14 @@ from PySide6.QtWidgets import (
 from app.auth import session
 from app.auth.cert_auth import verify_certificate_file
 from app.auth.passwords import verify_password
+from app.auth.recovery_codes import ROLES_WITH_RECOVERY_CODE
 from app.config import APP_NAME, AUTH_TYPE_CERTIFICADO
 from app.db.repositories import users as users_repo
 from app.ui.login.change_password_dialog import ChangePasswordDialog
 from app.ui.login.enrollment_dialog import EnrollmentDialog
 from app.ui.login.forgot_password_dialog import ForgotPasswordDialog
 from app.ui.login.import_update_dialog import ImportUpdateDialog
+from app.ui.login.recovery_code_dialog import RecoveryCodeRecoveryDialog
 
 
 class LoginWindow(QDialog):
@@ -96,6 +98,7 @@ class LoginWindow(QDialog):
             if not users_repo.has_certificate(user):
                 self._run_enrollment(user)
             else:
+                self.recovery_code_btn.setVisible(user.role in ROLES_WITH_RECOVERY_CODE)
                 self.stack.setCurrentIndex(2)
         else:
             self.stack.setCurrentIndex(1)
@@ -169,6 +172,12 @@ class LoginWindow(QDialog):
         login_btn.clicked.connect(self._on_login_cert)
         layout.addWidget(login_btn)
 
+        self.recovery_code_btn = QPushButton("¿Perdió o dañó su certificado? Recuperar con código de respaldo")
+        self.recovery_code_btn.setFlat(True)
+        self.recovery_code_btn.clicked.connect(self._on_recover_with_code)
+        self.recovery_code_btn.setVisible(False)
+        layout.addWidget(self.recovery_code_btn)
+
         back_btn = QPushButton("Regresar")
         back_btn.setFlat(True)
         back_btn.clicked.connect(self._on_back_to_username)
@@ -176,6 +185,17 @@ class LoginWindow(QDialog):
 
         self.cert_password_input.returnPressed.connect(self._on_login_cert)
         return page
+
+    def _on_recover_with_code(self) -> None:
+        user = self._user
+        dialog = RecoveryCodeRecoveryDialog(user, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.recovered:
+            QMessageBox.information(
+                self, "Acceso recuperado",
+                "Se eliminó el certificado anterior. A continuación genere uno nuevo "
+                "(incluido un nuevo código de respaldo).",
+            )
+            self._run_enrollment(users_repo.get_by_id(user.id))
 
     def _on_browse_cert(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar certificado", "", "Certificado (*.pfx)")

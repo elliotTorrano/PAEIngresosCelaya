@@ -8,7 +8,7 @@ from pathlib import Path
 from app.db.connection import get_connection
 
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
-CURRENT_VERSION = 3
+CURRENT_VERSION = 4
 
 # Migraciones incrementales para bases de datos creadas con una versión anterior
 # del esquema. schema.sql ya crea las tablas nuevas "desde cero" con todo esto
@@ -33,6 +33,10 @@ _MIGRATIONS: dict[int, str | list[str]] = {
             procede TEXT CHECK (procede IN ('PROCEDE', 'NO PROCEDE')),
             imported_at TEXT NOT NULL DEFAULT (datetime('now'))
         )""",
+    ],
+    4: [
+        "ALTER TABLE users ADD COLUMN recovery_code_hash TEXT",
+        "ALTER TABLE users ADD COLUMN recovery_code_salt TEXT",
     ],
 }
 

@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -74,4 +74,11 @@ VERSION_NOTES = {
               "exportación. Nuevo menú 'Histórico' (Agente y Abogado) con los archivos que "
               "han cargado. La exportación del Abogado agrega 'ENTREGA {fecha}' al nombre "
               "y ofrece enviarla por correo al Agente del lote, o sólo exportarla.",
+    "0.9.0": "Nuevo código de respaldo para Súper-usuario y Administrador: se muestra una "
+              "sola vez al generar el certificado y permite recuperar el acceso de "
+              "inmediato desde el login si se pierde o daña el certificado, sin depender "
+              "de la aprobación de nadie más. Las cuentas ya existentes pueden generar uno "
+              "desde 'Datos de cuenta'. Corregido además que la solicitud de 'Olvidé mi "
+              "contraseña o certificado' del propio Administrador se dirigía a sí mismo "
+              "(ahora se dirige al Súper-usuario, como respaldo adicional).",
 }

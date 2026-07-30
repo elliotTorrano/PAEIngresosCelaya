@@ -1,5 +1,30 @@
 # Historial de versiones — Sistema PAE
 
+## 0.9.0
+
+- **Nuevo: código de respaldo para Súper-usuario y Administrador.** Al
+  generar su certificado (la primera vez, o al reenrolar después de
+  perderlo) se muestra -- una sola vez -- un código de respaldo que debe
+  guardarse en un lugar seguro y distinto de la computadora. Si en el
+  futuro se pierde o daña el certificado, ese código permite recuperar el
+  acceso de inmediato desde la propia pantalla de login ("¿Perdió o dañó
+  su certificado? Recuperar con código de respaldo"), sin depender de que
+  otra persona apruebe nada. Sólo se guarda el hash del código, nunca el
+  código en sí; cada vez que se emite un certificado nuevo el código
+  anterior queda invalidado.
+- Para las cuentas que ya tenían certificado antes de esta versión, se
+  agregó un botón "Generar nuevo código de respaldo" en "Datos de
+  cuenta" (pide confirmar con el certificado actual, igual que cambiar
+  usuario/nombre/correo).
+- **Corrección**: si el propio Administrador perdía su certificado, el
+  botón "Olvidé mi contraseña o certificado" enviaba la solicitud a...
+  el correo del Administrador -- la misma cuenta bloqueada, sin nadie que
+  pudiera atenderla. Ahora, cuando quien solicita es el Administrador, la
+  solicitud se dirige al Súper-usuario (que ya puede resolverla desde
+  "Solicitudes de reset"); para los demás roles no cambia nada. Este
+  flujo por archivo queda como respaldo adicional si además se pierde el
+  código de respaldo.
+
 ## 0.8.0
 
 - **Corrección de bug en el login**: las tres pantallas del login (usuario,

@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.auth import recovery
-from app.config import ADMIN_NOTIFICATION_EMAIL_SUBJECT, RESET_REASON_LABELS
+from app.config import ADMIN_NOTIFICATION_EMAIL_SUBJECT, RESET_REASON_LABELS, ROLE_ADMINISTRADOR
 from app.db.repositories import users as users_repo
 from app.utils.paths import reset_requests_dir
 
@@ -61,11 +61,22 @@ class ForgotPasswordDialog(QDialog):
             QMessageBox.warning(self, "Usuario no encontrado", f"No existe el usuario '{username}' en esta instalación.")
             return
 
-        admin = users_repo.get_administrator()
-        if admin is None or not admin.email:
+        # Si quien pide el reset es el propio Administrador, la solicitud no
+        # puede dirigirse a sí mismo (es justo la cuenta bloqueada): se envía
+        # al Súper-usuario, la única otra cuenta que puede resolverla desde
+        # "Solicitudes de reset". Para cualquier otro rol, el Administrador
+        # sigue siendo el destinatario de siempre.
+        if user.role == ROLE_ADMINISTRADOR:
+            recipient = users_repo.get_superuser()
+            recipient_label = "Súper-usuario"
+        else:
+            recipient = users_repo.get_administrator()
+            recipient_label = "Administrador"
+
+        if recipient is None or not recipient.email:
             QMessageBox.critical(
-                self, "Sin Administrador configurado",
-                "No hay un Administrador con correo registrado en esta instalación.",
+                self, f"Sin {recipient_label} configurado",
+                f"No hay un {recipient_label} con correo registrado en esta instalación.",
             )
             return
 
@@ -91,7 +102,7 @@ class ForgotPasswordDialog(QDialog):
             f"Se adjunta el archivo de solicitud generado por el sistema."
         )
         attached = recovery.open_email_client(
-            to_email=admin.email, subject=ADMIN_NOTIFICATION_EMAIL_SUBJECT, body=body, attachment_path=request_path
+            to_email=recipient.email, subject=ADMIN_NOTIFICATION_EMAIL_SUBJECT, body=body, attachment_path=request_path
         )
 
         if attached:

@@ -9,6 +9,7 @@ def _make_user(cert_public_pem, cert_serial):
         id=1, username="jperez", role=ROLE_ADMINISTRADOR, full_name="Juan Pérez", email="j@j.com",
         auth_type=AUTH_TYPE_CERTIFICADO, password_hash=None, password_salt=None,
         cert_public_pem=cert_public_pem, cert_serial=cert_serial,
+        recovery_code_hash=None, recovery_code_salt=None,
         must_change_password=False, active=True,
     )
 

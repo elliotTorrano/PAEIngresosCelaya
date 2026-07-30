@@ -20,6 +20,8 @@ class User:
     password_salt: str | None
     cert_public_pem: str | None
     cert_serial: str | None
+    recovery_code_hash: str | None
+    recovery_code_salt: str | None
     must_change_password: bool
     active: bool
 
@@ -36,6 +38,8 @@ class User:
             password_salt=row["password_salt"],
             cert_public_pem=row["cert_public_pem"],
             cert_serial=row["cert_serial"],
+            recovery_code_hash=row["recovery_code_hash"],
+            recovery_code_salt=row["recovery_code_salt"],
             must_change_password=bool(row["must_change_password"]),
             active=bool(row["active"]),
         )
@@ -102,6 +106,22 @@ def set_certificate(user_id: int, *, cert_public_pem: str, cert_serial: str) -> 
         WHERE id = ?
         """,
         (cert_public_pem, cert_serial, user_id),
+    )
+    conn.commit()
+
+
+def set_recovery_code(user_id: int, *, recovery_code_hash: str, recovery_code_salt: str) -> None:
+    """Guarda el hash del código de respaldo (Súper-usuario/Administrador). Se
+    llama cada vez que se genera/regenera un certificado, así que un código
+    anterior queda invalidado en cuanto se emite uno nuevo."""
+    conn = get_connection()
+    conn.execute(
+        """
+        UPDATE users
+        SET recovery_code_hash = ?, recovery_code_salt = ?, updated_at = datetime('now')
+        WHERE id = ?
+        """,
+        (recovery_code_hash, recovery_code_salt, user_id),
     )
     conn.commit()
 
@@ -177,4 +197,11 @@ def get_administrator() -> User | None:
     from app.config import ROLE_ADMINISTRADOR
 
     users = list_by_role(ROLE_ADMINISTRADOR, active_only=False)
+    return users[0] if users else None
+
+
+def get_superuser() -> User | None:
+    from app.config import ROLE_SUPERUSUARIO
+
+    users = list_by_role(ROLE_SUPERUSUARIO, active_only=False)
     return users[0] if users else None

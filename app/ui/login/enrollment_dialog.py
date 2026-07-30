@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from app.auth.enrollment import enroll_certificate
 from app.db.repositories.users import User
+from app.ui.login.recovery_code_dialog import RecoveryCodeDisplayDialog
 
 
 class EnrollmentDialog(QDialog):
@@ -66,7 +67,7 @@ class EnrollmentDialog(QDialog):
 
         save_path = Path(folder) / f"{self.user.username}.pfx"
         try:
-            enroll_certificate(self.user, password=password, save_path=save_path)
+            recovery_code = enroll_certificate(self.user, password=password, save_path=save_path)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Error al generar certificado", str(exc))
             return
@@ -77,4 +78,8 @@ class EnrollmentDialog(QDialog):
             f"Certificado guardado en:\n{save_path}\n\nGuárdelo en un lugar seguro; lo necesitará junto "
             "con su contraseña para iniciar sesión.",
         )
+
+        if recovery_code:
+            RecoveryCodeDisplayDialog(recovery_code, parent=self).exec()
+
         self.accept()
