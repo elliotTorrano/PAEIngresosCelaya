@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -38,4 +38,12 @@ VERSION_NOTES = {
               "el único archivo con la verdad completa (modo DELETE); las bases ya "
               "creadas se convierten automáticamente la primera vez que se abren "
               "con esta versión.",
+    "0.6.0": "El programa ahora revisa, justo después de cada inicio de sesión, si hay "
+              "una versión más nueva publicada en GitHub; si la hay, pregunta si se "
+              "quiere instalar y, de aceptar, la descarga y se reemplaza sola "
+              "(usando un ayudante updater.exe incluido junto al programa). Si no hay "
+              "internet o algo falla en la consulta, no aparece ningún aviso y el "
+              "programa sigue igual que siempre. Las instalaciones anteriores a la "
+              "0.6.0 no tienen ese ayudante todavía, así que este primer salto debe "
+              "hacerse una vez de forma manual, como antes.",
 }

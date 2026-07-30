@@ -11,6 +11,7 @@ from app.db.migrations import ensure_schema
 from app.ui.login.login_window import LoginWindow
 from app.ui.main_window import MainWindow
 from app.ui.widgets.styles import apply_app_icon
+from app.update.flow import run_update_check
 
 
 def main() -> int:
@@ -32,6 +33,8 @@ def main() -> int:
         user = session.current()
         if user is None:
             continue
+
+        run_update_check(None)  # tras login exitoso, para cualquier rol; nunca bloquea el flujo normal
 
         window = MainWindow(user)
         window.show()

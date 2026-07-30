@@ -1,5 +1,33 @@
 # Historial de versiones — Sistema PAE
 
+## 0.6.0
+
+- **Autoactualización desde GitHub**: justo después de iniciar sesión (cualquier
+  rol), el programa consulta en segundo plano si hay una versión más nueva
+  publicada en el repositorio público de GitHub (`elliotTorrano/PAEIngresosCelaya`).
+  Si la hay, pregunta si se quiere instalar; de aceptar, la descarga y se
+  reemplaza sola, apoyándose en un ayudante externo (`updater.exe`, incluido
+  junto a `SistemaPAE.exe`) que hace el reemplazo del archivo una vez que el
+  programa principal ya se cerró, y lo vuelve a abrir automáticamente.
+- **Si no hay internet, o la consulta a GitHub falla por cualquier motivo**
+  (sin red, tiempo de espera agotado, GitHub no responde, etc.), no aparece
+  ningún aviso ni se interrumpe nada: el inicio de sesión sigue exactamente
+  igual que siempre. Sólo se avisa con un mensaje de error si el usuario ya
+  aceptó instalar y la descarga se corta a medias.
+- **Requisitos para publicar una versión nueva en GitHub** (para quien vaya a
+  hacerlo): crear un release con tag `vX.Y.Z` (o `X.Y.Z`) y adjuntar el
+  ejecutable con el nombre exacto `SistemaPAE.exe` — cualquier otro nombre no
+  se reconoce. `updater.exe` **no** se sube al release: ya viaja dentro de
+  cada carpeta distribuida (se genera junto con `SistemaPAE.exe` al compilar)
+  y es lo que ejecuta el reemplazo del lado del usuario.
+- **Aviso importante de arranque único**: las instalaciones en cualquier
+  versión anterior a la 0.6.0 no tienen `updater.exe` todavía, así que no
+  pueden autoactualizarse la primera vez (el programa simplemente no revisa
+  nada, porque el código de autoactualización no existe en esas versiones).
+  Ese primer salto a la 0.6.0 debe hacerse una vez de forma manual, copiando
+  la carpeta más reciente como hasta ahora; de ahí en adelante, la
+  autoactualización funciona sola.
+
 ## 0.5.1
 
 - **Corrección importante de integridad de datos**: la base usaba el modo WAL

@@ -57,3 +57,15 @@ def exports_dir() -> Path:
     d = data_dir() / "exports"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def update_dir() -> Path:
+    """Carpeta para descargas temporales de actualizaciones del programa."""
+    d = data_dir() / "update"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def updater_exe_path() -> Path:
+    """Ruta esperada de updater.exe, distribuido junto a SistemaPAE.exe."""
+    return base_dir() / "updater.exe"
