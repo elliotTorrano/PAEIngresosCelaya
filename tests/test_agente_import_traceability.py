@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import openpyxl
 from PySide6.QtWidgets import QDialog, QMessageBox
 
+from app.auth.cert_auth import GENERIC_FAILURE_MESSAGE
 from app.auth.crypto_certs import generate_certificate_bundle, load_bundle
 from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
 from app.db.connection import get_connection
@@ -279,6 +280,7 @@ def test_export_blocked_with_wrong_password(qapp, db, tmp_path):
         view._on_export()
 
     mock_warning.assert_called_once()
+    assert mock_warning.call_args[0][2] == GENERIC_FAILURE_MESSAGE
     mock_folder_dialog.assert_not_called()
     conn = get_connection()
     assert conn.execute("SELECT COUNT(*) AS n FROM requerimiento_batches").fetchone()["n"] == 0
@@ -323,7 +325,9 @@ def test_export_blocked_with_certificate_from_another_account(qapp, db, tmp_path
         view._on_export()
 
     mock_warning.assert_called_once()
-    assert "no corresponde" in mock_warning.call_args[0][2]
+    # Mensaje genérico deliberado: no debe distinguir "contraseña correcta,
+    # certificado ajeno" de "contraseña incorrecta" (ver test_export_blocked_with_wrong_password).
+    assert mock_warning.call_args[0][2] == GENERIC_FAILURE_MESSAGE
     mock_folder_dialog.assert_not_called()
     conn = get_connection()
     assert conn.execute("SELECT COUNT(*) AS n FROM requerimiento_batches").fetchone()["n"] == 0

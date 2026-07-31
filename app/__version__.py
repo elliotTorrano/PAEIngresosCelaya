@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.14.0"
+__version__ = "0.15.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -129,4 +129,11 @@ VERSION_NOTES = {
               "redimensionar arrastrando el borde. Se optimizó el refresco de las tablas "
               "grandes (import/revisión del Agente y captura del Abogado) para que no se "
               "sientan lentas al crecer.",
+    "0.15.0": "El mensaje que se muestra cuando falla la verificación de un certificado "
+              "(al iniciar sesión o al confirmar identidad antes de exportar) ya no revela "
+              "si la contraseña ingresada era correcta -- antes, probar un certificado que "
+              "no era el de la cuenta con la contraseña correcta mostraba un mensaje "
+              "distinto ('no corresponde a este usuario') al de una contraseña incorrecta, "
+              "lo que permitía confirmar si se acertó la contraseña de un certificado ajeno. "
+              "Ahora el mensaje es siempre el mismo, sin importar la causa real del rechazo.",
 }

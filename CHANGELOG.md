@@ -1,5 +1,18 @@
 # Historial de versiones — Sistema PAE
 
+## 0.15.0
+
+- **Seguridad: mensaje unificado al fallar la verificación de un
+  certificado** (login y confirmación de identidad antes de operaciones
+  sensibles como exportar). Antes, probar un .pfx que NO es el de la cuenta
+  con la contraseña correcta mostraba "Este certificado no corresponde a
+  este usuario", mientras que una contraseña incorrecta mostraba "El
+  archivo o la contraseña no son correctos" -- esa diferencia le permitía a
+  quien prueba un certificado ajeno confirmar si acertó su contraseña,
+  aunque no le sirviera para entrar a esa cuenta. Ahora ambos casos (y
+  cualquier otro motivo de rechazo) muestran siempre el mismo mensaje
+  genérico.
+
 ## 0.14.0
 
 - **Corregido: Enter dejaba de funcionar en el login tras "Regresar"**. Si se
