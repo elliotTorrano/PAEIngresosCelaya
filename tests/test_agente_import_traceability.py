@@ -9,7 +9,7 @@ from app.auth.crypto_certs import generate_certificate_bundle, load_bundle
 from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
 from app.db.connection import get_connection
 from app.db.repositories import users as users_repo
-from app.ui.agente.requerimientos_import_view import RequerimientosImportView
+from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
 from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
 
 
@@ -93,10 +93,10 @@ def test_selecting_a_file_logs_it_immediately(qapp, db, tmp_path):
     path = tmp_path / "lote_julio.xlsx"
     _write_valid_file(path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
@@ -121,33 +121,33 @@ def test_reusing_same_filename_in_a_new_batch_is_not_blocked(qapp, db, tmp_path)
     _write_valid_file(path)
 
     # Primera "sesión": se sube y se exporta (limpia self._rows/_source_filenames).
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
     assert len(view._rows) == 1
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog",
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog",
         return_value=_mock_confirm_dialog(private_key),
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getExistingDirectory",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory",
         return_value=str(exports_dir()),
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.information"):
         view._on_export()
     assert view._rows == []
     assert view._source_filenames == []
 
     # Segunda "sesión" (nuevo lote), mismo nombre de archivo: no debe avisar de duplicado.
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.question") as mock_question:
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.question") as mock_question:
         view._on_select_files()
 
     mock_question.assert_not_called()
@@ -170,23 +170,23 @@ def test_export_filename_follows_lista_del_convention(qapp, db, tmp_path):
     path = tmp_path / "lote.xlsx"
     _write_valid_file(path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog",
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog",
         return_value=_mock_confirm_dialog(private_key),
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getExistingDirectory",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory",
         return_value=str(exports_dir()),
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.information"):
         view._on_export()
 
     fecha = datetime.now().strftime("%d_%m_%Y")
@@ -206,18 +206,18 @@ def test_export_without_certificate_is_blocked(qapp, db, tmp_path):
     path = tmp_path / "lote.xlsx"
     _write_valid_file(path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.warning") as mock_warning, patch(
-        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog"
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.warning") as mock_warning, patch(
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog"
     ) as mock_confirm_cls:
         view._on_export()
 
@@ -231,9 +231,9 @@ def test_export_aborts_when_certificate_confirmation_rejected(qapp, db, tmp_path
     path = tmp_path / "lote.xlsx"
     _write_valid_file(path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
@@ -241,11 +241,11 @@ def test_export_aborts_when_certificate_confirmation_rejected(qapp, db, tmp_path
     mock_dialog = MagicMock()
     mock_dialog.exec.return_value = QDialog.DialogCode.Rejected
     with patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
     ), patch(
-        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog", return_value=mock_dialog
-    ), patch("app.ui.agente.requerimientos_import_view.QFileDialog.getExistingDirectory") as mock_folder_dialog:
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog", return_value=mock_dialog
+    ), patch("app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory") as mock_folder_dialog:
         view._on_export()
 
     mock_folder_dialog.assert_not_called()  # nunca debió llegar a pedir carpeta
@@ -262,9 +262,9 @@ def test_export_blocked_with_wrong_password(qapp, db, tmp_path):
     source_path = tmp_path / "lote.xlsx"
     _write_valid_file(source_path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(source_path)], ""),
     ):
         view._on_select_files()
@@ -272,10 +272,10 @@ def test_export_blocked_with_wrong_password(qapp, db, tmp_path):
     with patch.object(
         CertificateConfirmDialog, "exec", _make_confirm_exec(agente_pfx_path, "clave-incorrecta")
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
     ), patch("app.ui.widgets.certificate_confirm_dialog.QMessageBox.warning") as mock_warning, patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getExistingDirectory"
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory"
     ) as mock_folder_dialog:
         view._on_export()
 
@@ -307,9 +307,9 @@ def test_export_blocked_with_certificate_from_another_account(qapp, db, tmp_path
     source_path = tmp_path / "lote.xlsx"
     _write_valid_file(source_path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(source_path)], ""),
     ):
         view._on_select_files()
@@ -317,10 +317,10 @@ def test_export_blocked_with_certificate_from_another_account(qapp, db, tmp_path
     with patch.object(
         CertificateConfirmDialog, "exec", _make_confirm_exec(other_pfx_path, "clave-otro")
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
     ), patch("app.ui.widgets.certificate_confirm_dialog.QMessageBox.warning") as mock_warning, patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getExistingDirectory"
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory"
     ) as mock_folder_dialog:
         view._on_export()
 
@@ -340,9 +340,9 @@ def test_export_succeeds_with_correct_password_and_certificate(qapp, db, tmp_pat
     dest_folder = tmp_path / "destino"
     dest_folder.mkdir()
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(source_path)], ""),
     ):
         view._on_select_files()
@@ -350,12 +350,12 @@ def test_export_succeeds_with_correct_password_and_certificate(qapp, db, tmp_pat
     with patch.object(
         CertificateConfirmDialog, "exec", _make_confirm_exec(agente_pfx_path, "clave-agente")
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getExistingDirectory",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory",
         return_value=str(dest_folder),
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.information"):
         view._on_export()
 
     matches = list(dest_folder.glob("LISTA DEL *.mcdiep"))
@@ -367,20 +367,20 @@ def test_export_cancelled_folder_picker_creates_no_batch(qapp, db, tmp_path):
     path = tmp_path / "lote.xlsx"
     _write_valid_file(path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog",
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog",
         return_value=_mock_confirm_dialog(private_key),
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getExistingDirectory", return_value=""
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory", return_value=""
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
     ):
         view._on_export()
@@ -397,11 +397,11 @@ def test_files_label_lists_loaded_excel_files(qapp, db, tmp_path):
     path = tmp_path / "lote_julio.xlsx"
     _write_valid_file(path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     assert "ninguno" in view.files_label.text()
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
@@ -414,18 +414,18 @@ def test_export_rejected_confirmation_keeps_loaded_rows(qapp, db, tmp_path):
     path = tmp_path / "lote.xlsx"
     _write_valid_file(path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.No,
     ), patch(
-        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog"
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog"
     ) as mock_confirm_cls:
         view._on_export()
 
@@ -441,23 +441,23 @@ def test_export_confirmation_shows_file_list(qapp, db, tmp_path):
     path = tmp_path / "lote_agosto.xlsx"
     _write_valid_file(path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
     ) as mock_question, patch(
-        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog",
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog",
         return_value=_mock_confirm_dialog(private_key),
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getExistingDirectory",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory",
         return_value=str(tmp_path),
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.information"):
         view._on_export()
 
     mock_question.assert_called_once()
@@ -477,21 +477,21 @@ def test_export_overwrite_confirmation_declined_keeps_existing_file(qapp, db, tm
     existing = dest_folder / f"LISTA DEL {fecha} Abogado Uno.mcdiep"
     existing.write_bytes(b"contenido previo")
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         side_effect=[QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No],
     ), patch(
-        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog",
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog",
         return_value=_mock_confirm_dialog(private_key),
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getExistingDirectory",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory",
         return_value=str(dest_folder),
     ):
         view._on_export()
@@ -513,23 +513,23 @@ def test_export_overwrite_confirmed_replaces_file(qapp, db, tmp_path):
     existing = dest_folder / f"LISTA DEL {fecha} Abogado Uno.mcdiep"
     existing.write_bytes(b"contenido previo")
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.QMessageBox.question",
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
     ), patch(
-        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog",
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog",
         return_value=_mock_confirm_dialog(private_key),
     ), patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getExistingDirectory",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory",
         return_value=str(dest_folder),
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.information"):
         view._on_export()
 
     assert existing.read_bytes() != b"contenido previo"
@@ -543,9 +543,7 @@ def test_tables_use_interactive_resize_mode(qapp, db):
     from PySide6.QtWidgets import QHeaderView
 
     agente, _private_key = _make_agente_abogado()
-    view = RequerimientosImportView(agente)
+    view = RequerimientosGenerarView(agente)
 
     assert view.table.horizontalHeader().sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
     assert view.table.horizontalHeader().stretchLastSection() is True
-    assert view.revision_table.horizontalHeader().sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
-    assert view.revision_table.horizontalHeader().stretchLastSection() is True

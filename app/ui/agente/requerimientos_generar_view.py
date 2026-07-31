@@ -1,4 +1,4 @@
-"""Agente del PAE: selecciona abogado, carga Excel, revisa duplicados y exporta."""
+"""Agente del PAE: selecciona abogado, carga Excel y exporta el formato firmado."""
 
 from __future__ import annotations
 
@@ -6,17 +6,13 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
-    QLineEdit,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -27,23 +23,13 @@ from PySide6.QtWidgets import (
 
 from app.config import ROLE_ABOGADO
 from app.db.repositories import requerimientos as req_repo
-from app.db.repositories import revisiones as revisiones_repo
 from app.db.repositories import users as users_repo
 from app.excel_io import mcdiep_format
 from app.excel_io.duplicates import find_duplicate_filenames
-from app.excel_io.requerimientos_export import HEADERS_REVISION, export_for_abogado, export_revision
-from app.excel_io.requerimientos_import import (
-    McdiepVerificationError,
-    parse_abogado_export_file,
-    parse_requerimientos_file,
-)
+from app.excel_io.requerimientos_export import export_for_abogado
+from app.excel_io.requerimientos_import import parse_requerimientos_file
 from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
 from app.utils.paths import exports_dir
-
-PROCEDE_OPTIONS = ("", "PROCEDE", "NO PROCEDE")
-HIGHLIGHT_COLOR = QColor("#ffe08a")
-# Índices de columna de HEADERS_REVISION (= HEADERS_ABOGADO + ["Procede", "ID Abogado"]).
-REVISION_SEARCH_COLUMNS = {"FOLIO": 0, "CTA PREDIAL": 1, "CONTRIBUYENTE": 2}
 
 _INVALID_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')
 
@@ -53,7 +39,7 @@ def _sanitize_filename(text: str) -> str:
     return _INVALID_FILENAME_CHARS.sub("_", text).strip()
 
 
-class RequerimientosImportView(QWidget):
+class RequerimientosGenerarView(QWidget):
     def __init__(self, agente_user: users_repo.User, parent=None, simulate: bool = False):
         super().__init__(parent)
         self.agente_user = agente_user
@@ -107,47 +93,6 @@ class RequerimientosImportView(QWidget):
             select_btn.setEnabled(False)
             export_btn.setEnabled(False)
             layout.addWidget(QLabel("No hay Abogados dados de alta todavía."))
-
-        revision_box = QGroupBox("Revisión de captura del Abogado")
-        revision_layout = QVBoxLayout(revision_box)
-        revision_layout.addWidget(QLabel(
-            "Importe el Excel que el Abogado capturó y exportó, para marcar PROCEDE "
-            "o NO PROCEDE en cada fila."
-        ))
-
-        import_revision_btn = QPushButton("Importar captura del Abogado")
-        import_revision_btn.clicked.connect(self._on_import_revision)
-        revision_layout.addWidget(import_revision_btn)
-
-        revision_search_row = QHBoxLayout()
-        revision_search_row.addWidget(QLabel("Buscar por:"))
-        self.revision_search_field_combo = QComboBox()
-        for label in REVISION_SEARCH_COLUMNS:
-            self.revision_search_field_combo.addItem(label, REVISION_SEARCH_COLUMNS[label])
-        revision_search_row.addWidget(self.revision_search_field_combo)
-        self.revision_search_input = QLineEdit()
-        self.revision_search_input.setPlaceholderText("Escriba para buscar y posicionarse en la fila...")
-        self.revision_search_input.returnPressed.connect(self._on_search_revision)
-        revision_search_row.addWidget(self.revision_search_input)
-        revision_search_btn = QPushButton("Buscar")
-        revision_search_btn.clicked.connect(self._on_search_revision)
-        revision_search_row.addWidget(revision_search_btn)
-        revision_layout.addLayout(revision_search_row)
-
-        self.revision_table = QTableWidget(0, len(HEADERS_REVISION))
-        self.revision_table.setHorizontalHeaderLabels(HEADERS_REVISION)
-        self.revision_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.revision_table.horizontalHeader().setStretchLastSection(True)
-        self.revision_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        revision_layout.addWidget(self.revision_table)
-
-        export_revision_btn = QPushButton("Exportar revisión")
-        export_revision_btn.clicked.connect(self._on_export_revision)
-        revision_layout.addWidget(export_revision_btn)
-
-        layout.addWidget(revision_box)
-
-        self._refresh_revision_table()
 
     def _on_select_files(self) -> None:
         file_paths, _ = QFileDialog.getOpenFileNames(self, "Seleccionar archivos Excel", "", "Excel (*.xlsx *.xls)")
@@ -314,130 +259,3 @@ class RequerimientosImportView(QWidget):
         self._rows = []
         self._source_filenames = []
         self._refresh_preview()
-
-    # --- Revisión de captura del Abogado --------------------------------------------
-
-    def _on_import_revision(self) -> None:
-        if self.simulate:
-            QMessageBox.information(
-                self, "No disponible en simulación",
-                "En modo simulación no se puede importar ni guardar una revisión nueva.",
-            )
-            return
-
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Seleccionar captura del Abogado", "", "Sistema PAE (*.mcdiep)"
-        )
-        if not file_path:
-            return
-
-        try:
-            rows = parse_abogado_export_file(Path(file_path))
-        except McdiepVerificationError as exc:
-            QMessageBox.critical(self, "No se pudo abrir el archivo", str(exc))
-            return
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Error al leer el archivo", str(exc))
-            return
-
-        if not rows:
-            QMessageBox.warning(self, "Archivo vacío", "No se encontraron filas de datos en el archivo.")
-            return
-
-        abogado_id = self.abogado_combo.currentData()
-        abogado = users_repo.get_by_id(abogado_id) if abogado_id else None
-
-        revisiones_repo.add_revision_rows(
-            agente_id=self.agente_user.id,
-            source_filename=Path(file_path).name,
-            abogado_nombre=abogado.full_name if abogado else None,
-            abogado_id=abogado_id,
-            rows=rows,
-        )
-        self._refresh_revision_table()
-        QMessageBox.information(self, "Importado", f"Se importaron {len(rows)} filas para revisión.")
-
-    def _refresh_revision_table(self) -> None:
-        rows = revisiones_repo.list_revision_rows(self.agente_user.id)
-        self.revision_table.setUpdatesEnabled(False)
-        try:
-            self.revision_table.setRowCount(len(rows))
-            for r, row in enumerate(rows):
-                values = [
-                    row.folio, row.cta_predial, row.contribuyente, row.domicilio,
-                    row.fecha_citatorio, row.recibe_citatorio, row.recibe_citatorio_nombre,
-                    row.fecha_notificacion, row.quien_recibe, row.quien_recibe_nombre,
-                ]
-                for col, value in enumerate(values):
-                    item = QTableWidgetItem(value or "")
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    self.revision_table.setItem(r, col, item)
-
-                procede_combo = QComboBox()
-                for option in PROCEDE_OPTIONS:
-                    procede_combo.addItem(option, option or None)
-                if row.procede:
-                    procede_combo.setCurrentIndex(procede_combo.findData(row.procede))
-                procede_combo.currentIndexChanged.connect(
-                    lambda _i, row_id=row.id, combo=procede_combo: self._on_procede_changed(row_id, combo)
-                )
-                self.revision_table.setCellWidget(r, len(values), procede_combo)
-
-                id_item = QTableWidgetItem(str(row.abogado_id) if row.abogado_id else "")
-                id_item.setFlags(id_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                self.revision_table.setItem(r, len(values) + 1, id_item)
-        finally:
-            self.revision_table.setUpdatesEnabled(True)
-
-    def _flash_highlight_revision(self, row_index: int, columns: tuple[int, ...]) -> None:
-        original_colors = []
-        for col in columns:
-            item = self.revision_table.item(row_index, col)
-            original_colors.append(item.background())
-            item.setBackground(HIGHLIGHT_COLOR)
-
-        def revert():
-            for col, color in zip(columns, original_colors):
-                item = self.revision_table.item(row_index, col)
-                if item is not None:
-                    item.setBackground(color)
-
-        QTimer.singleShot(1000, revert)
-
-    def _on_search_revision(self) -> None:
-        text = self.revision_search_input.text().strip().lower()
-        if not text:
-            return
-
-        col = self.revision_search_field_combo.currentData()
-        for row_index in range(self.revision_table.rowCount()):
-            item = self.revision_table.item(row_index, col)
-            if item is not None and text in item.text().lower():
-                self.revision_table.scrollToItem(item)
-                self.revision_table.selectRow(row_index)
-                self._flash_highlight_revision(row_index, tuple(REVISION_SEARCH_COLUMNS.values()))
-                return
-
-        QMessageBox.information(self, "Sin resultados", "No se encontró ninguna fila que coincida con la búsqueda.")
-
-    def _on_procede_changed(self, row_id: int, combo: QComboBox) -> None:
-        if self.simulate:
-            return
-        revisiones_repo.update_revision_procede(row_id, combo.currentData())
-
-    def _on_export_revision(self) -> None:
-        rows = revisiones_repo.list_revision_rows(self.agente_user.id)
-        if not rows:
-            QMessageBox.warning(self, "Nada que exportar", "Importe una captura del Abogado primero.")
-            return
-
-        if self.simulate:
-            QMessageBox.information(
-                self, "Simulación", f"Se habrían exportado {len(rows)} filas de revisión. No se exportó nada de verdad."
-            )
-            return
-
-        fecha = datetime.now().strftime("%d_%m_%Y")
-        output_path = exports_dir() / f"REVISION DEL {fecha}.xlsx"
-        export_revision(rows, output_path)
-        QMessageBox.information(self, "Exportado", f"Archivo exportado:\n{output_path}")

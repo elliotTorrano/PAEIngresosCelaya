@@ -5,7 +5,7 @@ from app.db.repositories import revisiones as revisiones_repo
 from app.db.repositories import users as users_repo
 from app.db.repositories.requerimientos import RequerimientoRow
 from app.excel_io.requerimientos_export import HEADERS_ABOGADO, export_captured
-from app.ui.agente.requerimientos_import_view import RequerimientosImportView
+from app.ui.agente.requerimientos_revision_view import RequerimientosRevisionView
 
 
 def _make_agente_abogado():
@@ -34,11 +34,11 @@ def test_import_revision_persists_rows_and_refreshes_table(qapp, db, tmp_path):
     path = tmp_path / "captura.mcdiep"
     _write_captura_file(path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosRevisionView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileName",
+        "app.ui.agente.requerimientos_revision_view.QFileDialog.getOpenFileName",
         return_value=(str(path), ""),
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+    ), patch("app.ui.agente.requerimientos_revision_view.QMessageBox.information"):
         view._on_import_revision()
 
     rows = revisiones_repo.list_revision_rows(agente.id)
@@ -53,11 +53,11 @@ def test_import_revision_stores_and_displays_abogado_id(qapp, db, tmp_path):
     path = tmp_path / "captura.mcdiep"
     _write_captura_file(path)
 
-    view = RequerimientosImportView(agente)
+    view = RequerimientosRevisionView(agente)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileName",
+        "app.ui.agente.requerimientos_revision_view.QFileDialog.getOpenFileName",
         return_value=(str(path), ""),
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+    ), patch("app.ui.agente.requerimientos_revision_view.QMessageBox.information"):
         view._on_import_revision()
 
     rows = revisiones_repo.list_revision_rows(agente.id)
@@ -77,7 +77,7 @@ def test_procede_combo_change_persists(qapp, db):
             "fecha_notificacion": None, "quien_recibe": None, "quien_recibe_nombre": None,
         }],
     )
-    view = RequerimientosImportView(agente)
+    view = RequerimientosRevisionView(agente)
     row_id = revisiones_repo.list_revision_rows(agente.id)[0].id
     combo = view.revision_table.cellWidget(0, len(HEADERS_ABOGADO))  # columna PROCEDE
 
@@ -100,9 +100,9 @@ def test_export_revision_writes_file(qapp, db, tmp_path):
             "fecha_notificacion": None, "quien_recibe": None, "quien_recibe_nombre": None,
         }],
     )
-    view = RequerimientosImportView(agente)
+    view = RequerimientosRevisionView(agente)
 
-    with patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+    with patch("app.ui.agente.requerimientos_revision_view.QMessageBox.information"):
         view._on_export_revision()
 
     matches = list(exports_dir().glob("REVISION DEL *.xlsx"))
@@ -114,11 +114,11 @@ def test_simulate_mode_blocks_import_procede_and_export(qapp, db, tmp_path):
     path = tmp_path / "captura.mcdiep"
     _write_captura_file(path)
 
-    view = RequerimientosImportView(agente, simulate=True)
+    view = RequerimientosRevisionView(agente, simulate=True)
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileName"
-    ) as mock_dialog, patch("app.ui.agente.requerimientos_import_view.QMessageBox.information") as mock_info:
+        "app.ui.agente.requerimientos_revision_view.QFileDialog.getOpenFileName"
+    ) as mock_dialog, patch("app.ui.agente.requerimientos_revision_view.QMessageBox.information") as mock_info:
         view._on_import_revision()
     mock_dialog.assert_not_called()
     mock_info.assert_called_once()
@@ -139,7 +139,7 @@ def test_simulate_mode_blocks_import_procede_and_export(qapp, db, tmp_path):
     combo.setCurrentIndex(combo.findData("PROCEDE"))
     assert revisiones_repo.list_revision_rows(agente.id)[0].procede is None
 
-    with patch("app.ui.agente.requerimientos_import_view.QMessageBox.information") as mock_info2:
+    with patch("app.ui.agente.requerimientos_revision_view.QMessageBox.information") as mock_info2:
         view._on_export_revision()
     mock_info2.assert_called_once()
     assert "Simulación" in mock_info2.call_args[0][1]
@@ -168,7 +168,7 @@ def test_search_revision_by_contribuyente_selects_matching_row(qapp, db):
         agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None, abogado_id=None,
         rows=_rows_for_search(),
     )
-    view = RequerimientosImportView(agente)
+    view = RequerimientosRevisionView(agente)
 
     view.revision_search_field_combo.setCurrentIndex(
         view.revision_search_field_combo.findText("CONTRIBUYENTE")
@@ -185,10 +185,61 @@ def test_search_revision_no_match_shows_information(qapp, db):
         agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None, abogado_id=None,
         rows=_rows_for_search(),
     )
-    view = RequerimientosImportView(agente)
+    view = RequerimientosRevisionView(agente)
     view.revision_search_input.setText("no existe en ninguna fila")
 
-    with patch("app.ui.agente.requerimientos_import_view.QMessageBox.information") as mock_info:
+    with patch("app.ui.agente.requerimientos_revision_view.QMessageBox.information") as mock_info:
         view._on_search_revision()
 
     mock_info.assert_called_once()
+
+
+# --- Columnas redimensionables ----------------------------------------------------------
+
+def test_revision_table_uses_interactive_resize_mode(qapp, db):
+    from PySide6.QtWidgets import QHeaderView
+
+    agente = _make_agente_abogado()
+    view = RequerimientosRevisionView(agente)
+
+    assert view.revision_table.horizontalHeader().sectionResizeMode(0) == QHeaderView.ResizeMode.Interactive
+    assert view.revision_table.horizontalHeader().stretchLastSection() is True
+
+
+# --- Nombre del archivo en revisión (label + señal para el título de pestaña) ----------
+
+def test_import_revision_updates_filename_label(qapp, db, tmp_path):
+    from app.ui.agente.requerimientos_revision_view import SIN_ARCHIVO_TEXT
+
+    agente = _make_agente_abogado()
+    path = tmp_path / "captura.mcdiep"
+    _write_captura_file(path)
+
+    view = RequerimientosRevisionView(agente)
+    assert view.filename_label.text() == SIN_ARCHIVO_TEXT
+
+    with patch(
+        "app.ui.agente.requerimientos_revision_view.QFileDialog.getOpenFileName",
+        return_value=(str(path), ""),
+    ), patch("app.ui.agente.requerimientos_revision_view.QMessageBox.information"):
+        view._on_import_revision()
+
+    assert view.filename_label.text() == f"Archivo en revisión: {path.name}"
+
+
+def test_import_revision_emits_archivo_cambiado_signal(qapp, db, tmp_path):
+    agente = _make_agente_abogado()
+    path = tmp_path / "captura.mcdiep"
+    _write_captura_file(path)
+
+    view = RequerimientosRevisionView(agente)
+    received = []
+    view.archivo_cambiado.connect(received.append)
+
+    with patch(
+        "app.ui.agente.requerimientos_revision_view.QFileDialog.getOpenFileName",
+        return_value=(str(path), ""),
+    ), patch("app.ui.agente.requerimientos_revision_view.QMessageBox.information"):
+        view._on_import_revision()
+
+    assert received == [path.name]

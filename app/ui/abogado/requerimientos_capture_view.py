@@ -25,10 +25,8 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
-    QSplitter,
     QTableWidget,
     QTableWidgetItem,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -55,6 +53,23 @@ HEADERS = [
 ]
 
 HIGHLIGHT_COLOR = QColor("#ffe08a")
+
+DOC_TYPE_PENDIENTE = "PENDIENTE"
+DOC_TYPE_EXPORTADO = "EXPORTADO"
+DOC_TYPE_FINALIZADO = "FINALIZADO"
+DOC_TYPES = (
+    ("Pendiente", DOC_TYPE_PENDIENTE),
+    ("Exportado", DOC_TYPE_EXPORTADO),
+    ("Finalizado", DOC_TYPE_FINALIZADO),
+)
+
+
+def _category_for_batch(batch) -> str:
+    if batch["finalizado"]:
+        return DOC_TYPE_FINALIZADO
+    if batch["status"] == BATCH_STATUS_EXPORTADO:
+        return DOC_TYPE_EXPORTADO
+    return DOC_TYPE_PENDIENTE
 
 
 class RequerimientosCaptureView(QWidget):
@@ -113,69 +128,74 @@ class RequerimientosCaptureView(QWidget):
         search_row.addWidget(search_btn)
         layout.addLayout(search_row)
 
-        splitter = QSplitter()
-        # Pestañas en vez de una sola lista: cada lote se ubica automáticamente
-        # según su estado -- ver `_list_for_batch()`. "Exportados" también
-        # incluye un lote que YA se exportó antes pero se desbloqueó con
-        # "Editar captura" para corregirlo (ver `_on_unlock_edit`): vuelve a
-        # "Finalizados" en cuanto se re-exporta o se finaliza de nuevo.
-        self.batch_tabs = QTabWidget()
-        self.batch_tabs.setMaximumWidth(280)
-        self.pendientes_list = QListWidget()
-        self.exportados_list = QListWidget()
-        self.finalizados_list = QListWidget()
-        for batch_list in (self.pendientes_list, self.exportados_list, self.finalizados_list):
-            batch_list.currentItemChanged.connect(self._on_batch_selected)
-        self.batch_tabs.addTab(self.pendientes_list, "Pendientes")
-        self.batch_tabs.addTab(self.exportados_list, "Exportados")
-        self.batch_tabs.addTab(self.finalizados_list, "Finalizados")
-        splitter.addWidget(self.batch_tabs)
+        # Pantalla previa: primero se elige QUÉ TIPO de documento se busca
+        # (Pendiente/Exportado/Finalizado); sólo entonces se listan los lotes
+        # de ese tipo. "Abrir" carga el seleccionado en la tabla de abajo;
+        # "Limpiar" vacía la lista y cierra lo que estuviera abierto. Cambiar
+        # el tipo directamente también vacía y vuelve a poblar la lista (ver
+        # `_on_tipo_changed`), nunca mezcla tipos distintos en pantalla.
+        selector_row = QHBoxLayout()
+        selector_row.addWidget(QLabel("Tipo de documento:"))
+        self.tipo_combo = QComboBox()
+        for label, value in DOC_TYPES:
+            self.tipo_combo.addItem(label, value)
+        self.tipo_combo.currentIndexChanged.connect(self._on_tipo_changed)
+        selector_row.addWidget(self.tipo_combo)
+        open_batch_btn = QPushButton("Abrir")
+        open_batch_btn.clicked.connect(self._on_open_selected_batch)
+        selector_row.addWidget(open_batch_btn)
+        clear_btn = QPushButton("Limpiar")
+        clear_btn.clicked.connect(self._on_clear)
+        selector_row.addWidget(clear_btn)
+        layout.addLayout(selector_row)
+
+        self.available_list = QListWidget()
+        self.available_list.setMaximumHeight(140)
+        layout.addWidget(self.available_list)
 
         self.table = QTableWidget(0, len(HEADERS))
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        splitter.addWidget(self.table)
-        layout.addWidget(splitter)
+        layout.addWidget(self.table)
 
-        self._refresh_batch_list()
+        self._refresh_available_list()
 
     # --- Lotes -------------------------------------------------------------------
-    def _list_for_batch(self, batch) -> QListWidget:
-        if batch["finalizado"]:
-            return self.finalizados_list
-        if batch["status"] == BATCH_STATUS_EXPORTADO:
-            return self.exportados_list
-        return self.pendientes_list
-
-    def _refresh_batch_list(self) -> None:
-        for batch_list in (self.pendientes_list, self.exportados_list, self.finalizados_list):
-            batch_list.clear()
+    def _refresh_available_list(self) -> None:
+        self.available_list.clear()
+        category = self.tipo_combo.currentData()
         for batch in req_repo.list_batches_for_abogado(self.abogado_user.id):
+            if _category_for_batch(batch) != category:
+                continue
             label = f"Lote #{batch['id']} — {batch['status']} — {format_local_datetime(batch['created_at'])}"
             item = QListWidgetItem(label)
             item.setData(1000, batch["id"])
-            self._list_for_batch(batch).addItem(item)
+            self.available_list.addItem(item)
 
-    def _select_batch_in_tabs(self, batch_id: int) -> None:
-        """Cambia a la pestaña que contiene `batch_id` y lo selecciona en su
-        lista -- usado tras crear/exportar/finalizar/editar un lote, para que
-        el usuario vea a dónde se movió."""
-        for index, batch_list in enumerate(
-            (self.pendientes_list, self.exportados_list, self.finalizados_list)
-        ):
-            for row in range(batch_list.count()):
-                item = batch_list.item(row)
-                if item.data(1000) == batch_id:
-                    self.batch_tabs.setCurrentIndex(index)
-                    batch_list.setCurrentItem(item)
-                    return
+    def _on_tipo_changed(self) -> None:
+        # "Si se cambia directamente el tipo de documento, borre los archivos
+        # disponibles": no se conserva la lista del tipo anterior.
+        self._refresh_available_list()
 
-    def _on_batch_selected(self, current: QListWidgetItem, _previous) -> None:
-        if current is None:
+    def _on_open_selected_batch(self) -> None:
+        item = self.available_list.currentItem()
+        if item is None:
+            QMessageBox.information(
+                self, "Nada seleccionado", "Seleccione un documento de la lista primero."
+            )
             return
-        self._load_batch(current.data(1000))
+        self._load_batch(item.data(1000))
+
+    def _on_clear(self) -> None:
+        self.available_list.clear()
+        self._current_batch_id = None
+        self._rows = []
+        self._current_batch_finalizado = False
+        self.finalize_btn.setVisible(True)
+        self.edit_btn.setVisible(False)
+        self._refresh_table()
 
     def _load_batch(self, batch_id: int) -> None:
         self._current_batch_id = batch_id
@@ -224,9 +244,13 @@ class RequerimientosCaptureView(QWidget):
             original_filename=Path(file_path).name, agente_id=agente.id, abogado_id=self.abogado_user.id,
             batch_id=batch_id, row_count=len(rows),
         )
-        self._refresh_batch_list()
+        self.tipo_combo.setCurrentIndex(self.tipo_combo.findData(DOC_TYPE_PENDIENTE))
+        self._refresh_available_list()
         self._load_batch(batch_id)
-        self._select_batch_in_tabs(batch_id)
+        for row in range(self.available_list.count()):
+            if self.available_list.item(row).data(1000) == batch_id:
+                self.available_list.setCurrentRow(row)
+                break
         QMessageBox.information(
             self, "Importado",
             f"Se importaron {len(rows)} filas al lote #{batch_id}.\n\n"
@@ -431,8 +455,7 @@ class RequerimientosCaptureView(QWidget):
         self.finalize_btn.setVisible(False)
         self.edit_btn.setVisible(True)
         self._refresh_table()
-        self._refresh_batch_list()
-        self._select_batch_in_tabs(self._current_batch_id)
+        self._refresh_available_list()
 
     def _on_unlock_edit(self) -> None:
         if self._current_batch_id is None:
@@ -467,8 +490,7 @@ class RequerimientosCaptureView(QWidget):
         self.finalize_btn.setVisible(True)
         self.edit_btn.setVisible(False)
         self._refresh_table()
-        self._refresh_batch_list()
-        self._select_batch_in_tabs(self._current_batch_id)
+        self._refresh_available_list()
 
     # --- Exportar ------------------------------------------------------------------------
     def _ask_export_choice(self) -> str:
@@ -543,8 +565,7 @@ class RequerimientosCaptureView(QWidget):
         self.finalize_btn.setVisible(False)
         self.edit_btn.setVisible(True)
         self._refresh_table()
-        self._refresh_batch_list()
-        self._select_batch_in_tabs(self._current_batch_id)
+        self._refresh_available_list()
 
         locked_note = "\n\nEl lote quedó bloqueado; use 'Editar captura' para modificarlo."
         if choice == "email":

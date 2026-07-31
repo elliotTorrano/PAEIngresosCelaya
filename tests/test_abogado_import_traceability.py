@@ -364,7 +364,8 @@ def test_export_overwrite_confirmation_declined_keeps_existing_file(qapp, db):
 
 # --- Bloqueo automático al exportar + advertencia al editar ---------------------------
 
-def test_export_locks_batch_and_moves_to_finalizados_tab(qapp, db):
+def test_export_locks_batch_and_shows_under_finalizado_type(qapp, db):
+    from app.ui.abogado.requerimientos_capture_view import DOC_TYPE_FINALIZADO
     from app.utils.paths import exports_dir
 
     _, abogado, batch_id = _make_agente_abogado_with_batch()
@@ -384,10 +385,10 @@ def test_export_locks_batch_and_moves_to_finalizados_tab(qapp, db):
     assert view._current_batch_finalizado is True
     assert view.finalize_btn.isHidden() is True
     assert view.edit_btn.isHidden() is False
-    assert view.finalizados_list.count() == 1
-    assert view.finalizados_list.item(0).data(1000) == batch_id
-    assert view.exportados_list.count() == 0
-    assert view.pendientes_list.count() == 0
+
+    view.tipo_combo.setCurrentIndex(view.tipo_combo.findData(DOC_TYPE_FINALIZADO))
+    assert view.available_list.count() == 1
+    assert view.available_list.item(0).data(1000) == batch_id
 
 
 def test_unlock_edit_after_export_warns_and_declining_keeps_locked(qapp, db):
@@ -417,7 +418,8 @@ def test_unlock_edit_after_export_warns_and_declining_keeps_locked(qapp, db):
     assert view._current_batch_finalizado is True
 
 
-def test_unlock_edit_after_export_confirmed_unlocks_and_moves_to_exportados_tab(qapp, db):
+def test_unlock_edit_after_export_confirmed_unlocks_and_shows_under_exportado_type(qapp, db):
+    from app.ui.abogado.requerimientos_capture_view import DOC_TYPE_EXPORTADO, DOC_TYPE_FINALIZADO
     from app.utils.paths import exports_dir
 
     _, abogado, batch_id = _make_agente_abogado_with_batch()
@@ -441,9 +443,13 @@ def test_unlock_edit_after_export_confirmed_unlocks_and_moves_to_exportados_tab(
 
     assert req_repo.get_batch(batch_id)["finalizado"] == 0
     assert view._current_batch_finalizado is False
-    assert view.exportados_list.count() == 1
-    assert view.exportados_list.item(0).data(1000) == batch_id
-    assert view.finalizados_list.count() == 0
+
+    view.tipo_combo.setCurrentIndex(view.tipo_combo.findData(DOC_TYPE_EXPORTADO))
+    assert view.available_list.count() == 1
+    assert view.available_list.item(0).data(1000) == batch_id
+
+    view.tipo_combo.setCurrentIndex(view.tipo_combo.findData(DOC_TYPE_FINALIZADO))
+    assert view.available_list.count() == 0
 
 
 def test_unlock_edit_without_prior_export_does_not_warn(qapp, db):
@@ -467,7 +473,13 @@ def test_unlock_edit_without_prior_export_does_not_warn(qapp, db):
     assert req_repo.get_batch(batch_id)["finalizado"] == 0
 
 
-def test_batches_split_into_tabs_by_state(qapp, db):
+def test_available_list_filters_by_selected_tipo(qapp, db):
+    from app.ui.abogado.requerimientos_capture_view import (
+        DOC_TYPE_EXPORTADO,
+        DOC_TYPE_FINALIZADO,
+        DOC_TYPE_PENDIENTE,
+    )
+
     agente = users_repo.create_user(
         username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente Uno", email="a@a.com",
         auth_type=AUTH_TYPE_CERTIFICADO,
@@ -486,12 +498,86 @@ def test_batches_split_into_tabs_by_state(qapp, db):
 
     view = RequerimientosCaptureView(abogado)
 
-    assert view.pendientes_list.count() == 1
-    assert view.pendientes_list.item(0).data(1000) == pending_id
-    assert view.exportados_list.count() == 1
-    assert view.exportados_list.item(0).data(1000) == exported_id
-    assert view.finalizados_list.count() == 1
-    assert view.finalizados_list.item(0).data(1000) == finalized_id
+    # Por defecto arranca en "Pendiente" (primer elemento del combo).
+    assert view.available_list.count() == 1
+    assert view.available_list.item(0).data(1000) == pending_id
+
+    view.tipo_combo.setCurrentIndex(view.tipo_combo.findData(DOC_TYPE_EXPORTADO))
+    assert view.available_list.count() == 1
+    assert view.available_list.item(0).data(1000) == exported_id
+
+    view.tipo_combo.setCurrentIndex(view.tipo_combo.findData(DOC_TYPE_FINALIZADO))
+    assert view.available_list.count() == 1
+    assert view.available_list.item(0).data(1000) == finalized_id
+
+    view.tipo_combo.setCurrentIndex(view.tipo_combo.findData(DOC_TYPE_PENDIENTE))
+    assert view.available_list.count() == 1
+    assert view.available_list.item(0).data(1000) == pending_id
+
+
+def test_changing_tipo_directly_clears_previous_available_list(qapp, db):
+    from app.ui.abogado.requerimientos_capture_view import DOC_TYPE_EXPORTADO, DOC_TYPE_FINALIZADO
+
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente Uno", email="a@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    abogado = users_repo.create_user(
+        username="abogado1", role=ROLE_ABOGADO, full_name="Abogado Uno", email="b@b.com",
+        auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
+    )
+    req_repo.create_batch(abogado_id=abogado.id, agente_id=agente.id)  # PENDIENTE
+
+    view = RequerimientosCaptureView(abogado)
+    assert view.available_list.count() == 1
+
+    # No hay ningún lote FINALIZADO todavía: cambiar el tipo directamente
+    # debe vaciar la lista mostrada, no dejar los del tipo anterior.
+    view.tipo_combo.setCurrentIndex(view.tipo_combo.findData(DOC_TYPE_FINALIZADO))
+    assert view.available_list.count() == 0
+
+    view.tipo_combo.setCurrentIndex(view.tipo_combo.findData(DOC_TYPE_EXPORTADO))
+    assert view.available_list.count() == 0
+
+
+def test_open_selected_batch_loads_table(qapp, db):
+    _, abogado, batch_id = _make_agente_abogado_with_batch()
+    view = RequerimientosCaptureView(abogado)
+
+    assert view.available_list.count() == 1
+    view.available_list.setCurrentRow(0)
+    view._on_open_selected_batch()
+
+    assert view._current_batch_id == batch_id
+    assert view.table.rowCount() == 1
+
+
+def test_open_with_nothing_selected_shows_information(qapp, db):
+    _, abogado, _batch_id = _make_agente_abogado_with_batch()
+    view = RequerimientosCaptureView(abogado)
+    view.available_list.setCurrentRow(-1)
+
+    with patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.information") as mock_info:
+        view._on_open_selected_batch()
+
+    mock_info.assert_called_once()
+    assert view._current_batch_id is None
+
+
+def test_clear_resets_list_and_open_table(qapp, db):
+    _, abogado, batch_id = _make_agente_abogado_with_batch()
+    view = RequerimientosCaptureView(abogado)
+    view._load_batch(batch_id)
+    assert view.table.rowCount() == 1
+
+    view._on_clear()
+
+    assert view.available_list.count() == 0
+    assert view._current_batch_id is None
+    assert view._rows == []
+    assert view.table.rowCount() == 0
+    assert view.finalize_btn.isHidden() is False
+    assert view.edit_btn.isHidden() is True
 
 
 # --- Buscar fila por FOLIO/CTA PREDIAL/CONTRIBUYENTE -----------------------------------

@@ -4,7 +4,7 @@ import openpyxl
 
 from app.config import AUTH_TYPE_PASSWORD, ROLE_ABOGADO
 from app.db.repositories import users as users_repo
-from app.ui.agente.requerimientos_import_view import RequerimientosImportView
+from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
 
 
 def _make_abogado():
@@ -30,12 +30,12 @@ def test_import_with_no_footer_row_warns_instead_of_silent_zero(qapp, db, tmp_pa
     path = tmp_path / "prueba_sin_pie.xlsx"
     _write_small_file_without_footer(path)
 
-    view = RequerimientosImportView(_agente())
+    view = RequerimientosGenerarView(_agente())
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.warning") as mock_warning:
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.warning") as mock_warning:
         view._on_select_files()
 
     assert view._rows == []
@@ -50,12 +50,12 @@ def test_import_unreadable_file_shows_error_instead_of_crashing(qapp, db, tmp_pa
     bad_path = tmp_path / "no_es_excel.xlsx"
     bad_path.write_text("esto no es un archivo de Excel", encoding="utf-8")
 
-    view = RequerimientosImportView(_agente())
+    view = RequerimientosGenerarView(_agente())
 
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(bad_path)], ""),
-    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.critical") as mock_critical:
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.critical") as mock_critical:
         view._on_select_files()
 
     assert view._rows == []

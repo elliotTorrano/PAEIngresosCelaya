@@ -41,7 +41,7 @@ class MainWindow(QMainWindow):
 
         self._formato_widgets: dict[str, QWidget] = {}
         self._otros_widgets: dict[str, QWidget] = {}
-        self._viendo_como_widgets: dict[int, QWidget] = {}
+        self._viendo_como_widgets: dict[str, QWidget] = {}
         self._build_tabs()
 
         apply_window_background(self)
@@ -65,11 +65,17 @@ class MainWindow(QMainWindow):
         self._add_permanent_tab(WelcomeView(self.user), "Bienvenida")
 
         if role in ROLES_CAN_ACT_AS_AGENTE:
-            from app.ui.agente.requerimientos_import_view import RequerimientosImportView
+            from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
+            from app.ui.agente.requerimientos_revision_view import RequerimientosRevisionView
 
             self._add_permanent_tab(
-                RequerimientosImportView(self.user), "Formato de Requerimientos (Agente del PAE)"
+                RequerimientosGenerarView(self.user), "Generar formato (Agente del PAE)"
             )
+            revision_widget = RequerimientosRevisionView(self.user)
+            revision_widget.archivo_cambiado.connect(
+                lambda filename: self._on_revision_filename_changed(revision_widget, filename)
+            )
+            self._add_permanent_tab(revision_widget, "Revisar formato de abogado (Agente del PAE)")
 
         if role in (ROLE_ADMINISTRADOR, ROLE_SUPERUSUARIO):
             from app.ui.admin.account_settings_view import AccountSettingsView
@@ -105,27 +111,64 @@ class MainWindow(QMainWindow):
 
     def _build_formato_menu(self) -> None:
         menu = self.menuBar().addMenu("Formato")
-        req_action = menu.addAction("Formato de Requerimientos")
-        req_action.triggered.connect(self._show_requerimientos_tab)
+        if self.user.role == ROLE_AGENTE_PAE:
+            # Dos pantallas separadas (no una sola con todo apilado) para que
+            # generar el formato para el Abogado y revisar lo que el Abogado
+            # devolvió no se interrumpan visualmente entre sí.
+            generar_action = menu.addAction("Generar formato")
+            generar_action.triggered.connect(self._show_generar_formato_tab)
+            revisar_action = menu.addAction("Revisar formato de abogado")
+            revisar_action.triggered.connect(self._show_revisar_formato_tab)
+        else:
+            req_action = menu.addAction("Formato de Requerimientos")
+            req_action.triggered.connect(self._show_requerimientos_tab)
         mandamientos_action = menu.addAction("Mandamientos (próximamente)")
         mandamientos_action.triggered.connect(self._show_mandamientos_tab)
 
     def _show_requerimientos_tab(self) -> None:
+        """Sólo para el Abogado -- el Agente del PAE usa las dos pantallas
+        separadas: ver `_show_generar_formato_tab` y `_show_revisar_formato_tab`."""
         widget = self._formato_widgets.get("requerimientos")
         if widget is None or self.tabs.indexOf(widget) == -1:
-            if self.user.role == ROLE_AGENTE_PAE:
-                from app.ui.agente.requerimientos_import_view import RequerimientosImportView
+            from app.ui.abogado.requerimientos_capture_view import RequerimientosCaptureView
 
-                widget = RequerimientosImportView(self.user)
-                title = "Formato de Requerimientos (Agente del PAE)"
-            else:
-                from app.ui.abogado.requerimientos_capture_view import RequerimientosCaptureView
-
-                widget = RequerimientosCaptureView(self.user)
-                title = "Formato de Requerimientos (Abogado)"
-            self.tabs.addTab(widget, title)
+            widget = RequerimientosCaptureView(self.user)
+            self.tabs.addTab(widget, "Formato de Requerimientos (Abogado)")
             self._formato_widgets["requerimientos"] = widget
         self.tabs.setCurrentWidget(widget)
+
+    def _show_generar_formato_tab(self) -> None:
+        widget = self._formato_widgets.get("generar_formato")
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
+
+            widget = RequerimientosGenerarView(self.user)
+            self.tabs.addTab(widget, "Generar formato")
+            self._formato_widgets["generar_formato"] = widget
+        self.tabs.setCurrentWidget(widget)
+
+    def _show_revisar_formato_tab(self) -> None:
+        widget = self._formato_widgets.get("revisar_formato")
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            from app.ui.agente.requerimientos_revision_view import RequerimientosRevisionView
+
+            widget = RequerimientosRevisionView(self.user)
+            widget.archivo_cambiado.connect(
+                lambda filename, w=widget: self._on_revision_filename_changed(w, filename)
+            )
+            self.tabs.addTab(widget, "Revisar formato de abogado")
+            self._formato_widgets["revisar_formato"] = widget
+        self.tabs.setCurrentWidget(widget)
+
+    def _on_revision_filename_changed(self, widget: QWidget, filename: str) -> None:
+        index = self.tabs.indexOf(widget)
+        if index == -1:
+            return
+        base_title = widget.property("base_tab_title")
+        if base_title is None:
+            base_title = self.tabs.tabText(index)
+            widget.setProperty("base_tab_title", base_title)
+        self.tabs.setTabText(index, f"{base_title} — {filename}" if filename else base_title)
 
     def _show_mandamientos_tab(self) -> None:
         widget = self._formato_widgets.get("mandamientos")
@@ -189,19 +232,38 @@ class MainWindow(QMainWindow):
             return
 
         target = dialog.selected_user
-        widget = self._viendo_como_widgets.get(target.id)
-        if widget is None or self.tabs.indexOf(widget) == -1:
-            if target.role == ROLE_AGENTE_PAE:
-                from app.ui.agente.requerimientos_import_view import RequerimientosImportView
+        if target.role == ROLE_AGENTE_PAE:
+            from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
+            from app.ui.agente.requerimientos_revision_view import RequerimientosRevisionView
 
-                widget = RequerimientosImportView(target, simulate=True)
-            else:
-                from app.ui.abogado.requerimientos_capture_view import RequerimientosCaptureView
+            generar_key = f"generar:{target.id}"
+            generar_widget = self._viendo_como_widgets.get(generar_key)
+            if generar_widget is None or self.tabs.indexOf(generar_widget) == -1:
+                generar_widget = RequerimientosGenerarView(target, simulate=True)
+                self.tabs.addTab(generar_widget, f"Viendo como: {target.full_name} — Generar formato")
+                self._viendo_como_widgets[generar_key] = generar_widget
 
+            revisar_key = f"revisar:{target.id}"
+            revisar_widget = self._viendo_como_widgets.get(revisar_key)
+            if revisar_widget is None or self.tabs.indexOf(revisar_widget) == -1:
+                revisar_widget = RequerimientosRevisionView(target, simulate=True)
+                revisar_widget.archivo_cambiado.connect(
+                    lambda filename, w=revisar_widget: self._on_revision_filename_changed(w, filename)
+                )
+                self.tabs.addTab(revisar_widget, f"Viendo como: {target.full_name} — Revisar formato de abogado")
+                self._viendo_como_widgets[revisar_key] = revisar_widget
+
+            self.tabs.setCurrentWidget(generar_widget)
+        else:
+            from app.ui.abogado.requerimientos_capture_view import RequerimientosCaptureView
+
+            key = f"abogado:{target.id}"
+            widget = self._viendo_como_widgets.get(key)
+            if widget is None or self.tabs.indexOf(widget) == -1:
                 widget = RequerimientosCaptureView(target, simulate=True)
-            self.tabs.addTab(widget, f"Viendo como: {target.full_name}")
-            self._viendo_como_widgets[target.id] = widget
-        self.tabs.setCurrentWidget(widget)
+                self.tabs.addTab(widget, f"Viendo como: {target.full_name}")
+                self._viendo_como_widgets[key] = widget
+            self.tabs.setCurrentWidget(widget)
 
     def _on_logout(self) -> None:
         session.end()

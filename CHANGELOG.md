@@ -1,5 +1,23 @@
 # Historial de versiones — Sistema PAE
 
+## 0.18.0
+
+- **Menú Formato del Agente del PAE dividido en dos pantallas**: "Generar
+  formato" (subir Excel y exportar para el Abogado) y "Revisar formato de
+  abogado" (importar la captura y marcar PROCEDE/NO PROCEDE) ya no
+  comparten una sola pantalla apilada -- cada una es su propia pestaña,
+  para que una no interrumpa visualmente a la otra.
+- **Revisar formato de abogado** muestra el nombre del archivo que se
+  está revisando, tanto en una etiqueta dentro de la pantalla como en el
+  título de su propia pestaña.
+- **Vista del Abogado rediseñada**: se quitaron las pestañas Pendientes/
+  Exportados/Finalizados. En su lugar hay una pantalla previa con un
+  combo para elegir el tipo de documento (Pendiente/Exportado/
+  Finalizado); al elegir uno se listan los lotes de ese tipo, un botón
+  "Abrir" carga el seleccionado en la tabla de captura y otro "Limpiar"
+  vacía la lista y cierra lo que estuviera abierto. Cambiar el tipo
+  directamente también vacía la lista mostrada, sin mezclar tipos.
+
 ## 0.17.0
 
 - **Buscador de filas (Abogado y Agente)**: nuevo botón "Buscar" en la

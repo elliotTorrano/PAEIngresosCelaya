@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.17.0"
+__version__ = "0.18.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -154,4 +154,15 @@ VERSION_NOTES = {
               "queda bloqueado automáticamente en cuanto se exporta -- para editarlo de "
               "nuevo hay que usar 'Editar captura', que ahora avisa si ese lote ya se había "
               "exportado antes (el archivo ya entregado no se actualiza solo).",
+    "0.18.0": "El menú Formato del Agente del PAE ahora tiene dos pantallas separadas: "
+              "'Generar formato' (subir Excel y exportar para el Abogado) y 'Revisar "
+              "formato de abogado' (importar la captura y marcar PROCEDE/NO PROCEDE), en "
+              "vez de una sola pantalla con todo apilado. La pantalla de revisión muestra "
+              "el nombre del archivo que se está revisando, tanto en una etiqueta como en "
+              "el título de su pestaña. En la vista del Abogado se quitaron las pestañas "
+              "Pendientes/Exportados/Finalizados: ahora hay una pantalla previa con un "
+              "combo para elegir el tipo de documento (Pendiente/Exportado/Finalizado), "
+              "que lista los lotes de ese tipo; un botón 'Abrir' carga el seleccionado en "
+              "la tabla y otro 'Limpiar' vacía la lista y cierra lo abierto. Cambiar el "
+              "tipo directamente también vacía la lista mostrada.",
 }

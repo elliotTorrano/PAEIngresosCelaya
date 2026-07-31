@@ -7,7 +7,7 @@ from app.db.connection import get_connection
 from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import users as users_repo
 from app.ui.abogado.requerimientos_capture_view import RequerimientosCaptureView
-from app.ui.agente.requerimientos_import_view import RequerimientosImportView
+from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
 
 
 def _write_valid_file(path):
@@ -34,7 +34,7 @@ def _make_abogado():
     )
 
 
-# --- RequerimientosImportView(simulate=True) -------------------------------------
+# --- RequerimientosGenerarView(simulate=True) -------------------------------------
 
 def test_simulated_agente_select_files_does_not_log_history(qapp, db, tmp_path):
     agente = _make_agente()
@@ -42,9 +42,9 @@ def test_simulated_agente_select_files_does_not_log_history(qapp, db, tmp_path):
     path = tmp_path / "lote.xlsx"
     _write_valid_file(path)
 
-    view = RequerimientosImportView(agente, simulate=True)
+    view = RequerimientosGenerarView(agente, simulate=True)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
@@ -61,14 +61,14 @@ def test_simulated_agente_export_does_not_create_batch(qapp, db, tmp_path):
     path = tmp_path / "lote.xlsx"
     _write_valid_file(path)
 
-    view = RequerimientosImportView(agente, simulate=True)
+    view = RequerimientosGenerarView(agente, simulate=True)
     with patch(
-        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
         return_value=([str(path)], ""),
     ):
         view._on_select_files()
 
-    with patch("app.ui.agente.requerimientos_import_view.QMessageBox.information") as mock_info:
+    with patch("app.ui.agente.requerimientos_generar_view.QMessageBox.information") as mock_info:
         view._on_export()
 
     mock_info.assert_called_once()

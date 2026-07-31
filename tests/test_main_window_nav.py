@@ -47,16 +47,37 @@ def test_agente_starts_on_welcome_only(qapp, db):
     assert _tab_titles(window) == ["Bienvenida"]
 
 
-def test_agente_formato_menu_adds_and_reuses_requerimientos_tab(qapp, db):
+def test_agente_formato_menu_adds_and_reuses_generar_tab(qapp, db):
     window = MainWindow(_make_agente())
 
-    window._show_requerimientos_tab()
-    assert _tab_titles(window) == ["Bienvenida", "Formato de Requerimientos (Agente del PAE)"]
-    assert window.tabs.currentWidget() is window._formato_widgets["requerimientos"]
+    window._show_generar_formato_tab()
+    assert _tab_titles(window) == ["Bienvenida", "Generar formato"]
+    assert window.tabs.currentWidget() is window._formato_widgets["generar_formato"]
 
     window.tabs.setCurrentIndex(0)
-    window._show_requerimientos_tab()
+    window._show_generar_formato_tab()
     assert window.tabs.count() == 2  # no se duplica
+
+
+def test_agente_formato_menu_adds_and_reuses_revisar_tab(qapp, db):
+    window = MainWindow(_make_agente())
+
+    window._show_revisar_formato_tab()
+    assert _tab_titles(window) == ["Bienvenida", "Revisar formato de abogado"]
+    assert window.tabs.currentWidget() is window._formato_widgets["revisar_formato"]
+
+    window.tabs.setCurrentIndex(0)
+    window._show_revisar_formato_tab()
+    assert window.tabs.count() == 2  # no se duplica
+
+
+def test_agente_generar_y_revisar_son_pestanas_independientes(qapp, db):
+    window = MainWindow(_make_agente())
+
+    window._show_generar_formato_tab()
+    window._show_revisar_formato_tab()
+
+    assert _tab_titles(window) == ["Bienvenida", "Generar formato", "Revisar formato de abogado"]
 
 
 def test_agente_formato_menu_mandamientos_placeholder(qapp, db):
@@ -100,7 +121,8 @@ def test_admin_keeps_direct_requerimientos_tab_plus_welcome(qapp, db):
     titles = _tab_titles(window)
     assert titles == [
         "Bienvenida",
-        "Formato de Requerimientos (Agente del PAE)",
+        "Generar formato (Agente del PAE)",
+        "Revisar formato de abogado (Agente del PAE)",
         "Usuarios",
         "Solicitudes de reset",
         "Apariencia",
@@ -117,28 +139,49 @@ def test_permanent_tabs_have_no_close_button(qapp, db):
 
 def test_dynamic_tab_can_be_closed_and_reopened(qapp, db):
     window = MainWindow(_make_agente())
-    window._show_requerimientos_tab()
-    widget = window._formato_widgets["requerimientos"]
+    window._show_generar_formato_tab()
+    widget = window._formato_widgets["generar_formato"]
     index = window.tabs.indexOf(widget)
 
     window._on_tab_close_requested(index)
 
-    assert "requerimientos" not in window._formato_widgets
+    assert "generar_formato" not in window._formato_widgets
     assert _tab_titles(window) == ["Bienvenida"]
 
-    window._show_requerimientos_tab()
-    assert "Formato de Requerimientos (Agente del PAE)" in _tab_titles(window)
+    window._show_generar_formato_tab()
+    assert "Generar formato" in _tab_titles(window)
 
 
 def test_super_gets_ver_como_menu_and_can_open_agente_simulation(qapp, db):
     agente = _make_agente()
     window = MainWindow(_make_super())
 
-    from app.ui.agente.requerimientos_import_view import RequerimientosImportView
+    from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
 
-    widget = RequerimientosImportView(agente, simulate=True)
-    window.tabs.addTab(widget, f"Viendo como: {agente.full_name}")
-    window._viendo_como_widgets[agente.id] = widget
+    widget = RequerimientosGenerarView(agente, simulate=True)
+    window.tabs.addTab(widget, f"Viendo como: {agente.full_name} — Generar formato")
+    window._viendo_como_widgets[f"generar:{agente.id}"] = widget
 
     assert widget.simulate is True
-    assert f"Viendo como: {agente.full_name}" in _tab_titles(window)
+    assert f"Viendo como: {agente.full_name} — Generar formato" in _tab_titles(window)
+
+
+def test_super_can_open_agente_simulation_via_choose_dialog(qapp, db):
+    from unittest.mock import MagicMock, patch
+
+    agente = _make_agente()
+    window = MainWindow(_make_super())
+
+    mock_dialog = MagicMock()
+    from PySide6.QtWidgets import QDialog
+    mock_dialog.exec.return_value = QDialog.DialogCode.Accepted
+    mock_dialog.selected_user = agente
+
+    with patch("app.ui.widgets.choose_user_dialog.ChooseUserDialog", return_value=mock_dialog):
+        window._on_choose_view_as()
+
+    titles = _tab_titles(window)
+    assert f"Viendo como: {agente.full_name} — Generar formato" in titles
+    assert f"Viendo como: {agente.full_name} — Revisar formato de abogado" in titles
+    assert f"generar:{agente.id}" in window._viendo_como_widgets
+    assert f"revisar:{agente.id}" in window._viendo_como_widgets
