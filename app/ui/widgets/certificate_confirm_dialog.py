@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from app.auth.cert_auth import verify_certificate_file
 from app.auth.crypto_certs import load_bundle
+from app.config import window_title
 from app.db.repositories.users import User
 
 
@@ -33,7 +34,7 @@ class CertificateConfirmDialog(QDialog):
         self.user = user
         self._cert_path: str | None = None
         self.private_key = None
-        self.setWindowTitle(f"Confirmar identidad — {user.full_name}")
+        self.setWindowTitle(window_title(f"Confirmar identidad — {user.full_name}"))
         self.setMinimumWidth(420)
 
         layout = QVBoxLayout(self)

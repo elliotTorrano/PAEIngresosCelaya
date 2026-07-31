@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout
 
 from app.auth.passwords import hash_password
+from app.config import window_title
 from app.db.repositories import users as users_repo
 
 
@@ -12,7 +13,7 @@ class ChangePasswordDialog(QDialog):
     def __init__(self, user: users_repo.User, parent=None):
         super().__init__(parent)
         self.user = user
-        self.setWindowTitle("Cambio de contraseña obligatorio")
+        self.setWindowTitle(window_title("Cambio de contraseña obligatorio"))
         self.setMinimumWidth(380)
 
         layout = QVBoxLayout(self)

@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox, QProgressDialog, QWidget
 
 from app.__version__ import __version__
-from app.config import APP_NAME
+from app.config import APP_NAME, window_title
 from app.update import checker, installer
 from app.utils import paths
 
@@ -49,7 +49,7 @@ def run_update_check(parent: QWidget | None) -> None:
 
         dest = paths.update_dir() / "SistemaPAE_nuevo.exe"
         progress = QProgressDialog("Descargando actualización...", "Cancelar", 0, 100, parent)
-        progress.setWindowTitle("Actualizando")
+        progress.setWindowTitle(window_title("Actualizando"))
         progress.setWindowModality(Qt.WindowModality.WindowModal)
         progress.setMinimumDuration(0)
         progress.setValue(0)

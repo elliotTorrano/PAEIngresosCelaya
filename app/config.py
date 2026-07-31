@@ -1,6 +1,14 @@
 """Constantes globales: roles, tipos de autenticación y estados."""
 
+from app.__version__ import __version__
+
 APP_NAME = "Sistema PAE"
+SICPAE_NAME = "SICPAE"
+
+
+def window_title(name: str) -> str:
+    """Formato estándar del título de toda ventana: '{nombre} - SICPAE v#.##.##'."""
+    return f"{name} - {SICPAE_NAME} v{__version__}"
 
 ROLE_SUPERUSUARIO = "SUPERUSUARIO"
 ROLE_ADMINISTRADOR = "ADMINISTRADOR"

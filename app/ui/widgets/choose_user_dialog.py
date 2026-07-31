@@ -15,14 +15,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from app.config import ROLE_ABOGADO, ROLE_AGENTE_PAE, ROLE_LABELS
+from app.config import ROLE_ABOGADO, ROLE_AGENTE_PAE, ROLE_LABELS, window_title
 from app.db.repositories import users as users_repo
 
 
 class ChooseUserDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Ver como...")
+        self.setWindowTitle(window_title("Ver como..."))
         self.selected_user: users_repo.User | None = None
 
         layout = QVBoxLayout(self)

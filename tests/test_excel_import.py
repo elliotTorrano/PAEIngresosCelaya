@@ -36,6 +36,23 @@ def test_parse_requerimientos_file_skips_rows_and_maps_columns(tmp_path):
     assert result.rows[1]["folio"] == "F-002"
 
 
+def test_parse_requerimientos_file_folio_numerico_sin_decimales(tmp_path):
+    """Cuando Excel guarda el FOLIO como número (no como texto), openpyxl lo
+    entrega como float (p. ej. 1234.0) -- no debe verse "1234.0" en el resultado."""
+    path = tmp_path / "origen_numerico.xlsx"
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["irrelevant title row"])
+    ws.append(["A", "FOLIO", "CTA PREDIAL", "CONTRIBUYENTE", "E", "DOMICILIO"])
+    ws.append(["x1", 1234, "CP-001", "Juan Pérez", "y1", "Calle 1"])
+    ws.append(["TOTAL", "", "", "", "", ""])
+    wb.save(path)
+
+    result = parse_requerimientos_file(path)
+
+    assert result.rows[0]["folio"] == "1234"
+
+
 def test_parse_requerimientos_file_supports_legacy_xls(tmp_path):
     import xlwt
 

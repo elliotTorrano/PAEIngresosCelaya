@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.auth.recovery_codes import verify_recovery_code
+from app.config import window_title
 from app.db.repositories import users as users_repo
 from app.db.repositories.users import User
 
@@ -26,7 +27,7 @@ class RecoveryCodeDisplayDialog(QDialog):
 
     def __init__(self, code: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Código de respaldo")
+        self.setWindowTitle(window_title("Código de respaldo"))
         self.setMinimumWidth(420)
 
         layout = QVBoxLayout(self)
@@ -67,7 +68,7 @@ class RecoveryCodeRecoveryDialog(QDialog):
         super().__init__(parent)
         self.user = user
         self.recovered = False
-        self.setWindowTitle("Recuperar con código de respaldo")
+        self.setWindowTitle(window_title("Recuperar con código de respaldo"))
         self.setMinimumWidth(420)
 
         layout = QVBoxLayout(self)

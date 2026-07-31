@@ -14,6 +14,7 @@ from app.config import (
     ROLE_LABELS,
     ROLE_SUPERUSUARIO,
     ROLES_CAN_ACT_AS_AGENTE,
+    window_title,
 )
 from app.db.repositories.users import User
 from app.ui.widgets.background_widget import BackgroundWidget
@@ -25,7 +26,7 @@ class MainWindow(QMainWindow):
     def __init__(self, user: User):
         super().__init__()
         self.user = user
-        self.setWindowTitle(f"{APP_NAME} v{__version__} — {ROLE_LABELS[user.role]}: {user.full_name}")
+        self.setWindowTitle(window_title(f"{ROLE_LABELS[user.role]}: {user.full_name}"))
         self.resize(1100, 720)
 
         self._background = BackgroundWidget()

@@ -54,7 +54,7 @@ def parse_requerimientos_file(path: Path) -> ImportResult:
             continue
         rows.append(
             {
-                "folio": _value_text(row, COL_FOLIO),
+                "folio": _folio_text(row, COL_FOLIO),
                 "cta_predial": _value_text(row, COL_CTA_PREDIAL),
                 "contribuyente": _value_text(row, COL_CONTRIBUYENTE),
                 "domicilio": _value_text(row, COL_DOMICILIO),
@@ -152,4 +152,19 @@ def _value_text(row: list, col_index_1based: int) -> str | None:
     value = row[idx]
     if value is None or value == "":
         return None
+    return str(value).strip()
+
+
+def _folio_text(row: list, col_index_1based: int) -> str | None:
+    """Igual que `_value_text`, pero el folio es siempre un número entero:
+    cuando Excel lo guarda como número (no como texto), openpyxl/xlrd lo
+    devuelven como float (p. ej. 1234.0) y str() deja el ".0" a la vista."""
+    idx = col_index_1based - 1
+    if idx >= len(row):
+        return None
+    value = row[idx]
+    if value is None or value == "":
+        return None
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
     return str(value).strip()

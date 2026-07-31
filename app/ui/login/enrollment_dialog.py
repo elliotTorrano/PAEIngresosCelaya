@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.auth.enrollment import enroll_certificate
+from app.config import window_title
 from app.db.repositories.users import User
 from app.ui.login.recovery_code_dialog import RecoveryCodeDisplayDialog
 
@@ -30,7 +31,7 @@ class EnrollmentDialog(QDialog):
         super().__init__(parent)
         self.user = user
         self.deferred = False
-        self.setWindowTitle("Generar certificado de acceso")
+        self.setWindowTitle(window_title("Generar certificado de acceso"))
         self.setMinimumWidth(420)
 
         layout = QVBoxLayout(self)

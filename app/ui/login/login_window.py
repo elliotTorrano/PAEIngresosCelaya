@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -23,13 +23,21 @@ from app.auth import session
 from app.auth.cert_auth import verify_certificate_file
 from app.auth.passwords import verify_password
 from app.auth.recovery_codes import ROLES_WITH_RECOVERY_CODE
-from app.config import APP_NAME, AUTH_TYPE_CERTIFICADO
+from app.config import AUTH_TYPE_CERTIFICADO, window_title
 from app.db.repositories import users as users_repo
 from app.ui.login.change_password_dialog import ChangePasswordDialog
 from app.ui.login.enrollment_dialog import EnrollmentDialog
 from app.ui.login.forgot_password_dialog import ForgotPasswordDialog
 from app.ui.login.import_update_dialog import ImportUpdateDialog
 from app.ui.login.recovery_code_dialog import RecoveryCodeRecoveryDialog
+from app.ui.widgets.background_widget import BackgroundWidget
+from app.ui.widgets.styles import login_background_path
+
+WELCOME_TITLE = (
+    "Bienvenido/a al Sistema de Control del Proceso Administrativo de "
+    "Ejecución del Municipio de Celaya, Gto."
+)
+WELCOME_SUBTITLE = "Por favor, ingrese su usuario y posteriormente su certificado."
 
 
 class LoginWindow(QDialog):
@@ -44,14 +52,34 @@ class LoginWindow(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Iniciar sesión — {APP_NAME}")
-        self.setMinimumWidth(420)
+        self.setWindowTitle(window_title("Iniciar sesión"))
+        self.setMinimumSize(480, 420)
         self._user: users_repo.User | None = None
         self._cert_path: str | None = None
 
         outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        background = BackgroundWidget()
+        background.set_image_path(login_background_path())
+        bg_layout = QVBoxLayout(background)
+        bg_layout.setContentsMargins(16, 16, 16, 16)
+
+        welcome_title = QLabel(WELCOME_TITLE)
+        welcome_title.setWordWrap(True)
+        welcome_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        welcome_subtitle = QLabel(WELCOME_SUBTITLE)
+        welcome_subtitle.setWordWrap(True)
+        welcome_subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        for label in (welcome_title, welcome_subtitle):
+            label.setStyleSheet(
+                "background-color: rgba(255, 255, 255, 0.85); padding: 6px; border-radius: 4px;"
+            )
+        bg_layout.addWidget(welcome_title)
+        bg_layout.addWidget(welcome_subtitle)
+
         self.stack = QStackedWidget()
-        outer.addWidget(self.stack)
+        bg_layout.addWidget(self.stack)
 
         self.stack.addWidget(self._build_username_page())
         self.stack.addWidget(self._build_password_page())
@@ -66,7 +94,9 @@ class LoginWindow(QDialog):
         import_link.clicked.connect(self._on_import_update)
         links.addWidget(forgot_link)
         links.addWidget(import_link)
-        outer.addLayout(links)
+        bg_layout.addLayout(links)
+
+        outer.addWidget(background)
 
     # --- Página 1: usuario -----------------------------------------------------
     def _build_username_page(self) -> QWidget:

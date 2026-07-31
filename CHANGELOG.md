@@ -1,5 +1,21 @@
 # Historial de versiones — Sistema PAE
 
+## 0.16.0
+
+- **Nueva pantalla de login**: fondo con el escudo del Municipio de Celaya
+  (ajustado al tamaño de la ventana en cada momento, preservando la
+  proporción -- no se deforma ni usa el tamaño real de la imagen) y mensaje
+  de bienvenida: "Bienvenido/a al Sistema de Control del Proceso
+  Administrativo de Ejecución del Municipio de Celaya, Gto." seguido de
+  "Por favor, ingrese su usuario y posteriormente su certificado."
+- **Títulos de ventana unificados**: las 10 ventanas del programa (login,
+  ventana principal, enrolamiento, cambio de contraseña, código de
+  respaldo, confirmar identidad, etc.) ahora siguen el mismo formato:
+  "{nombre de la ventana} - SICPAE v#.##.##".
+- **Corregido: FOLIO numérico con ".0" al importar**. Cuando el Excel de
+  origen guarda el FOLIO como número (no como texto), Excel/openpyxl lo
+  entregan como decimal (p. ej. 1234.0); ahora se importa como "1234".
+
 ## 0.15.0
 
 - **Seguridad: mensaje unificado al fallar la verificación de un

@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.15.0"
+__version__ = "0.16.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -136,4 +136,11 @@ VERSION_NOTES = {
               "distinto ('no corresponde a este usuario') al de una contraseña incorrecta, "
               "lo que permitía confirmar si se acertó la contraseña de un certificado ajeno. "
               "Ahora el mensaje es siempre el mismo, sin importar la causa real del rechazo.",
+    "0.16.0": "Nueva pantalla de login con el escudo del Municipio de Celaya de fondo "
+              "(ajustado al tamaño de la ventana, sin deformarse) y el mensaje de "
+              "bienvenida al Sistema de Control del Proceso Administrativo de Ejecución "
+              "(SICPAE). Todos los títulos de ventana siguen ahora el mismo formato: "
+              "'{nombre de la ventana} - SICPAE v#.##.##'. Corregido: cuando el FOLIO se "
+              "guarda como número en el Excel de origen, ya no aparece con '.0' al final "
+              "al importarlo.",
 }

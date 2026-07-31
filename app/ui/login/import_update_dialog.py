@@ -7,12 +7,13 @@ from pathlib import Path
 from PySide6.QtWidgets import QDialog, QFileDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout
 
 from app.auth import recovery
+from app.config import window_title
 
 
 class ImportUpdateDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Importar actualización del Administrador")
+        self.setWindowTitle(window_title("Importar actualización del Administrador"))
         self.setMinimumWidth(420)
 
         layout = QVBoxLayout(self)

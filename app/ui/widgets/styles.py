@@ -27,6 +27,13 @@ def default_background_path() -> Path:
     return resource_dir() / "default_background.png"
 
 
+def login_background_path() -> Path:
+    """Imagen de fondo fija de la pantalla de login (escudo del Municipio de
+    Celaya) -- a diferencia del fondo general, no es configurable por el
+    Administrador."""
+    return resource_dir() / "login_background.png"
+
+
 def apply_app_icon(app: QApplication) -> None:
     icon_path = settings_repo.get(settings_repo.KEY_ICON_PATH) or str(default_icon_path())
     if Path(icon_path).exists():
