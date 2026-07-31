@@ -62,6 +62,14 @@ class LoginWindow(QDialog):
 
         background = BackgroundWidget()
         background.set_image_path(login_background_path())
+        # Fondo semi-opaco para CUALQUIER QLabel que cuelgue de esta ventana --
+        # sin esto, el texto de las 3 páginas (usuario, contraseña, certificado)
+        # se pinta directamente sobre la imagen de fondo y se pierde en las
+        # zonas claras del escudo. Los QLabel de bienvenida, más abajo, tienen
+        # su propio setStyleSheet (más ancho de relleno) que gana sobre esta regla.
+        background.setStyleSheet(
+            "QLabel { background-color: rgba(255, 255, 255, 0.85); padding: 2px 4px; border-radius: 3px; }"
+        )
         bg_layout = QVBoxLayout(background)
         bg_layout.setContentsMargins(16, 16, 16, 16)
 

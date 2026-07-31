@@ -1,5 +1,13 @@
 # Historial de versiones — Sistema PAE
 
+## 0.16.1
+
+- **Corregido: texto sin opacidad en la pantalla de login**. Las etiquetas
+  de las páginas de usuario, contraseña y certificado no tenían fondo
+  opaco, así que el texto se perdía contra las zonas claras del escudo de
+  fondo. Ahora tienen el mismo fondo blanco semi-opaco que ya tenía el
+  mensaje de bienvenida.
+
 ## 0.16.0
 
 - **Nueva pantalla de login**: fondo con el escudo del Municipio de Celaya

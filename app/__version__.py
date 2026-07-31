@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.16.0"
+__version__ = "0.16.1"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -143,4 +143,8 @@ VERSION_NOTES = {
               "'{nombre de la ventana} - SICPAE v#.##.##'. Corregido: cuando el FOLIO se "
               "guarda como número en el Excel de origen, ya no aparece con '.0' al final "
               "al importarlo.",
+    "0.16.1": "Corregido: en la pantalla de login, el texto de las páginas de usuario, "
+              "contraseña y certificado no tenía fondo opaco y se perdía contra las zonas "
+              "claras del escudo. Ahora todas las etiquetas de esas páginas tienen el mismo "
+              "fondo semi-opaco que ya tenía el mensaje de bienvenida.",
 }
