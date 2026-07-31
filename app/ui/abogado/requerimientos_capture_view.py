@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -96,11 +97,39 @@ class RequerimientosCaptureView(QWidget):
         import_row.addWidget(self.edit_btn)
         layout.addLayout(import_row)
 
+        search_row = QHBoxLayout()
+        search_row.addWidget(QLabel("Buscar por:"))
+        self.search_field_combo = QComboBox()
+        self.search_field_combo.addItem("FOLIO", COL_FOLIO)
+        self.search_field_combo.addItem("CTA PREDIAL", COL_CTA)
+        self.search_field_combo.addItem("CONTRIBUYENTE", COL_CONTRIB)
+        search_row.addWidget(self.search_field_combo)
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Escriba para buscar y posicionarse en la fila...")
+        self.search_input.returnPressed.connect(self._on_search)
+        search_row.addWidget(self.search_input)
+        search_btn = QPushButton("Buscar")
+        search_btn.clicked.connect(self._on_search)
+        search_row.addWidget(search_btn)
+        layout.addLayout(search_row)
+
         splitter = QSplitter()
-        self.batch_list = QListWidget()
-        self.batch_list.setMaximumWidth(260)
-        self.batch_list.currentItemChanged.connect(self._on_batch_selected)
-        splitter.addWidget(self.batch_list)
+        # Pestañas en vez de una sola lista: cada lote se ubica automáticamente
+        # según su estado -- ver `_list_for_batch()`. "Exportados" también
+        # incluye un lote que YA se exportó antes pero se desbloqueó con
+        # "Editar captura" para corregirlo (ver `_on_unlock_edit`): vuelve a
+        # "Finalizados" en cuanto se re-exporta o se finaliza de nuevo.
+        self.batch_tabs = QTabWidget()
+        self.batch_tabs.setMaximumWidth(280)
+        self.pendientes_list = QListWidget()
+        self.exportados_list = QListWidget()
+        self.finalizados_list = QListWidget()
+        for batch_list in (self.pendientes_list, self.exportados_list, self.finalizados_list):
+            batch_list.currentItemChanged.connect(self._on_batch_selected)
+        self.batch_tabs.addTab(self.pendientes_list, "Pendientes")
+        self.batch_tabs.addTab(self.exportados_list, "Exportados")
+        self.batch_tabs.addTab(self.finalizados_list, "Finalizados")
+        splitter.addWidget(self.batch_tabs)
 
         self.table = QTableWidget(0, len(HEADERS))
         self.table.setHorizontalHeaderLabels(HEADERS)
@@ -113,15 +142,35 @@ class RequerimientosCaptureView(QWidget):
         self._refresh_batch_list()
 
     # --- Lotes -------------------------------------------------------------------
+    def _list_for_batch(self, batch) -> QListWidget:
+        if batch["finalizado"]:
+            return self.finalizados_list
+        if batch["status"] == BATCH_STATUS_EXPORTADO:
+            return self.exportados_list
+        return self.pendientes_list
+
     def _refresh_batch_list(self) -> None:
-        self.batch_list.clear()
+        for batch_list in (self.pendientes_list, self.exportados_list, self.finalizados_list):
+            batch_list.clear()
         for batch in req_repo.list_batches_for_abogado(self.abogado_user.id):
             label = f"Lote #{batch['id']} — {batch['status']} — {format_local_datetime(batch['created_at'])}"
-            if batch["finalizado"]:
-                label += " — FINALIZADO"
             item = QListWidgetItem(label)
             item.setData(1000, batch["id"])
-            self.batch_list.addItem(item)
+            self._list_for_batch(batch).addItem(item)
+
+    def _select_batch_in_tabs(self, batch_id: int) -> None:
+        """Cambia a la pestaña que contiene `batch_id` y lo selecciona en su
+        lista -- usado tras crear/exportar/finalizar/editar un lote, para que
+        el usuario vea a dónde se movió."""
+        for index, batch_list in enumerate(
+            (self.pendientes_list, self.exportados_list, self.finalizados_list)
+        ):
+            for row in range(batch_list.count()):
+                item = batch_list.item(row)
+                if item.data(1000) == batch_id:
+                    self.batch_tabs.setCurrentIndex(index)
+                    batch_list.setCurrentItem(item)
+                    return
 
     def _on_batch_selected(self, current: QListWidgetItem, _previous) -> None:
         if current is None:
@@ -177,6 +226,7 @@ class RequerimientosCaptureView(QWidget):
         )
         self._refresh_batch_list()
         self._load_batch(batch_id)
+        self._select_batch_in_tabs(batch_id)
         QMessageBox.information(
             self, "Importado",
             f"Se importaron {len(rows)} filas al lote #{batch_id}.\n\n"
@@ -313,7 +363,22 @@ class RequerimientosCaptureView(QWidget):
                 return idx
         return None
 
-    # --- Resaltar faltantes -----------------------------------------------------------
+    # --- Resaltar faltantes / buscar ---------------------------------------------------
+    def _flash_highlight(self, row_index: int, columns: tuple[int, ...]) -> None:
+        original_colors = []
+        for col in columns:
+            item = self.table.item(row_index, col)
+            original_colors.append(item.background())
+            item.setBackground(HIGHLIGHT_COLOR)
+
+        def revert():
+            for col, color in zip(columns, original_colors):
+                item = self.table.item(row_index, col)
+                if item is not None:
+                    item.setBackground(color)
+
+        QTimer.singleShot(1000, revert)
+
     def _on_highlight_missing(self) -> None:
         missing_index = next((i for i, row in enumerate(self._rows) if not row.is_captured), None)
         if missing_index is None:
@@ -322,20 +387,24 @@ class RequerimientosCaptureView(QWidget):
 
         self.table.scrollToItem(self.table.item(missing_index, COL_FOLIO))
         self.table.selectRow(missing_index)
+        self._flash_highlight(missing_index, (COL_FOLIO, COL_CTA, COL_CONTRIB, COL_DOM))
 
-        original_colors = []
-        for col in (COL_FOLIO, COL_CTA, COL_CONTRIB, COL_DOM):
-            item = self.table.item(missing_index, col)
-            original_colors.append(item.background())
-            item.setBackground(HIGHLIGHT_COLOR)
+    def _on_search(self) -> None:
+        text = self.search_input.text().strip().lower()
+        if not text:
+            return
 
-        def revert():
-            for col, color in zip((COL_FOLIO, COL_CTA, COL_CONTRIB, COL_DOM), original_colors):
-                item = self.table.item(missing_index, col)
-                if item is not None:
-                    item.setBackground(color)
+        col = self.search_field_combo.currentData()
+        field_by_col = {COL_FOLIO: "folio", COL_CTA: "cta_predial", COL_CONTRIB: "contribuyente"}
+        for row_index, row in enumerate(self._rows):
+            value = getattr(row, field_by_col[col]) or ""
+            if text in value.lower():
+                self.table.scrollToItem(self.table.item(row_index, col))
+                self.table.selectRow(row_index)
+                self._flash_highlight(row_index, (COL_FOLIO, COL_CTA, COL_CONTRIB, COL_DOM))
+                return
 
-        QTimer.singleShot(1000, revert)
+        QMessageBox.information(self, "Sin resultados", "No se encontró ninguna fila que coincida con la búsqueda.")
 
     # --- Finalizar / editar --------------------------------------------------------------
     def _on_finalize(self) -> None:
@@ -363,6 +432,7 @@ class RequerimientosCaptureView(QWidget):
         self.edit_btn.setVisible(True)
         self._refresh_table()
         self._refresh_batch_list()
+        self._select_batch_in_tabs(self._current_batch_id)
 
     def _on_unlock_edit(self) -> None:
         if self._current_batch_id is None:
@@ -374,12 +444,31 @@ class RequerimientosCaptureView(QWidget):
             )
             return
 
+        # Si el lote YA se exportó antes, desbloquearlo para editar no
+        # actualiza solo el archivo que ya se entregó -- hay que avisarlo
+        # explícitamente antes de permitirlo (a diferencia de un lote que
+        # sólo se finalizó manualmente sin haberse exportado todavía).
+        batch = req_repo.get_batch(self._current_batch_id)
+        if batch is not None and batch["status"] == BATCH_STATUS_EXPORTADO:
+            proceed = QMessageBox.warning(
+                self, "Lote ya exportado",
+                "Este lote ya se exportó anteriormente. Si edita la captura ahora, el "
+                "archivo que ya se exportó NO se actualiza solo: deberá volver a "
+                "exportarlo cuando termine sus cambios.\n\n"
+                "¿Desea desbloquear la captura de todas formas?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if proceed != QMessageBox.StandardButton.Yes:
+                return
+
         req_repo.set_batch_finalizado(self._current_batch_id, False)
         self._current_batch_finalizado = False
         self.finalize_btn.setVisible(True)
         self.edit_btn.setVisible(False)
         self._refresh_table()
         self._refresh_batch_list()
+        self._select_batch_in_tabs(self._current_batch_id)
 
     # --- Exportar ------------------------------------------------------------------------
     def _ask_export_choice(self) -> str:
@@ -445,8 +534,19 @@ class RequerimientosCaptureView(QWidget):
         export_captured(rows_to_export, output_path)
         req_repo.set_batch_export_path(self._current_batch_id, abogado_path=str(output_path))
         req_repo.set_batch_status(self._current_batch_id, BATCH_STATUS_EXPORTADO)
-        self._refresh_batch_list()
 
+        # Los datos ya exportados quedan bloqueados de inmediato -- igual que
+        # "Finalizar captura" -- para que no se editen por accidente después
+        # de entregados; "Editar captura" los desbloquea (con advertencia).
+        req_repo.set_batch_finalizado(self._current_batch_id, True)
+        self._current_batch_finalizado = True
+        self.finalize_btn.setVisible(False)
+        self.edit_btn.setVisible(True)
+        self._refresh_table()
+        self._refresh_batch_list()
+        self._select_batch_in_tabs(self._current_batch_id)
+
+        locked_note = "\n\nEl lote quedó bloqueado; use 'Editar captura' para modificarlo."
         if choice == "email":
             batch = req_repo.get_batch(self._current_batch_id)
             agente = users_repo.get_by_id(batch["agente_id"]) if batch else None
@@ -457,12 +557,14 @@ class RequerimientosCaptureView(QWidget):
                     body=f"Se adjunta la captura del lote #{self._current_batch_id}.",
                     attachment_path=output_path,
                 )
-                QMessageBox.information(self, "Exportado", f"Archivo exportado y correo abierto:\n{output_path}")
+                QMessageBox.information(
+                    self, "Exportado", f"Archivo exportado y correo abierto:\n{output_path}{locked_note}"
+                )
             else:
                 QMessageBox.warning(
                     self, "Sin correo del Agente",
                     "El archivo se exportó, pero el Agente del PAE de este lote no tiene correo "
-                    f"registrado, así que no se pudo abrir el correo:\n{output_path}",
+                    f"registrado, así que no se pudo abrir el correo:\n{output_path}{locked_note}",
                 )
         else:
-            QMessageBox.information(self, "Exportado", f"Archivo exportado:\n{output_path}")
+            QMessageBox.information(self, "Exportado", f"Archivo exportado:\n{output_path}{locked_note}")

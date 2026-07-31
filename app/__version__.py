@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.16.1"
+__version__ = "0.17.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -147,4 +147,11 @@ VERSION_NOTES = {
               "contraseña y certificado no tenía fondo opaco y se perdía contra las zonas "
               "claras del escudo. Ahora todas las etiquetas de esas páginas tienen el mismo "
               "fondo semi-opaco que ya tenía el mensaje de bienvenida.",
+    "0.17.0": "Nuevo botón 'Buscar' (por FOLIO, CTA PREDIAL o CONTRIBUYENTE) en la captura "
+              "del Abogado y en la revisión del Agente, que posiciona y resalta la fila "
+              "encontrada. Los lotes del Abogado ahora se muestran en pestañas Pendientes/"
+              "Exportados/Finalizados, moviéndose sola cada una según su estado. Un lote "
+              "queda bloqueado automáticamente en cuanto se exporta -- para editarlo de "
+              "nuevo hay que usar 'Editar captura', que ahora avisa si ese lote ya se había "
+              "exportado antes (el archivo ya entregado no se actualiza solo).",
 }

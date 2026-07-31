@@ -6,7 +6,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -39,6 +41,9 @@ from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
 from app.utils.paths import exports_dir
 
 PROCEDE_OPTIONS = ("", "PROCEDE", "NO PROCEDE")
+HIGHLIGHT_COLOR = QColor("#ffe08a")
+# Índices de columna de HEADERS_REVISION (= HEADERS_ABOGADO + ["Procede", "ID Abogado"]).
+REVISION_SEARCH_COLUMNS = {"FOLIO": 0, "CTA PREDIAL": 1, "CONTRIBUYENTE": 2}
 
 _INVALID_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')
 
@@ -113,6 +118,21 @@ class RequerimientosImportView(QWidget):
         import_revision_btn = QPushButton("Importar captura del Abogado")
         import_revision_btn.clicked.connect(self._on_import_revision)
         revision_layout.addWidget(import_revision_btn)
+
+        revision_search_row = QHBoxLayout()
+        revision_search_row.addWidget(QLabel("Buscar por:"))
+        self.revision_search_field_combo = QComboBox()
+        for label in REVISION_SEARCH_COLUMNS:
+            self.revision_search_field_combo.addItem(label, REVISION_SEARCH_COLUMNS[label])
+        revision_search_row.addWidget(self.revision_search_field_combo)
+        self.revision_search_input = QLineEdit()
+        self.revision_search_input.setPlaceholderText("Escriba para buscar y posicionarse en la fila...")
+        self.revision_search_input.returnPressed.connect(self._on_search_revision)
+        revision_search_row.addWidget(self.revision_search_input)
+        revision_search_btn = QPushButton("Buscar")
+        revision_search_btn.clicked.connect(self._on_search_revision)
+        revision_search_row.addWidget(revision_search_btn)
+        revision_layout.addLayout(revision_search_row)
 
         self.revision_table = QTableWidget(0, len(HEADERS_REVISION))
         self.revision_table.setHorizontalHeaderLabels(HEADERS_REVISION)
@@ -368,6 +388,37 @@ class RequerimientosImportView(QWidget):
                 self.revision_table.setItem(r, len(values) + 1, id_item)
         finally:
             self.revision_table.setUpdatesEnabled(True)
+
+    def _flash_highlight_revision(self, row_index: int, columns: tuple[int, ...]) -> None:
+        original_colors = []
+        for col in columns:
+            item = self.revision_table.item(row_index, col)
+            original_colors.append(item.background())
+            item.setBackground(HIGHLIGHT_COLOR)
+
+        def revert():
+            for col, color in zip(columns, original_colors):
+                item = self.revision_table.item(row_index, col)
+                if item is not None:
+                    item.setBackground(color)
+
+        QTimer.singleShot(1000, revert)
+
+    def _on_search_revision(self) -> None:
+        text = self.revision_search_input.text().strip().lower()
+        if not text:
+            return
+
+        col = self.revision_search_field_combo.currentData()
+        for row_index in range(self.revision_table.rowCount()):
+            item = self.revision_table.item(row_index, col)
+            if item is not None and text in item.text().lower():
+                self.revision_table.scrollToItem(item)
+                self.revision_table.selectRow(row_index)
+                self._flash_highlight_revision(row_index, tuple(REVISION_SEARCH_COLUMNS.values()))
+                return
+
+        QMessageBox.information(self, "Sin resultados", "No se encontró ninguna fila que coincida con la búsqueda.")
 
     def _on_procede_changed(self, row_id: int, combo: QComboBox) -> None:
         if self.simulate:

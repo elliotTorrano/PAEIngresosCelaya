@@ -360,3 +360,178 @@ def test_export_overwrite_confirmation_declined_keeps_existing_file(qapp, db):
     assert existing.read_bytes() == b"contenido previo"
     batch = req_repo.get_batch(batch_id)
     assert batch["status"] != "EXPORTADO"
+
+
+# --- Bloqueo automático al exportar + advertencia al editar ---------------------------
+
+def test_export_locks_batch_and_moves_to_finalizados_tab(qapp, db):
+    from app.utils.paths import exports_dir
+
+    _, abogado, batch_id = _make_agente_abogado_with_batch()
+    view = RequerimientosCaptureView(abogado)
+    view._load_batch(batch_id)
+
+    with patch(
+        "app.ui.abogado.requerimientos_capture_view.RequerimientosCaptureView._ask_export_choice",
+        return_value="only",
+    ), patch(
+        "app.ui.abogado.requerimientos_capture_view.QFileDialog.getExistingDirectory",
+        return_value=str(exports_dir()),
+    ), patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.information"):
+        view._on_export()
+
+    assert req_repo.get_batch(batch_id)["finalizado"] == 1
+    assert view._current_batch_finalizado is True
+    assert view.finalize_btn.isHidden() is True
+    assert view.edit_btn.isHidden() is False
+    assert view.finalizados_list.count() == 1
+    assert view.finalizados_list.item(0).data(1000) == batch_id
+    assert view.exportados_list.count() == 0
+    assert view.pendientes_list.count() == 0
+
+
+def test_unlock_edit_after_export_warns_and_declining_keeps_locked(qapp, db):
+    from app.utils.paths import exports_dir
+
+    _, abogado, batch_id = _make_agente_abogado_with_batch()
+    view = RequerimientosCaptureView(abogado)
+    view._load_batch(batch_id)
+
+    with patch(
+        "app.ui.abogado.requerimientos_capture_view.RequerimientosCaptureView._ask_export_choice",
+        return_value="only",
+    ), patch(
+        "app.ui.abogado.requerimientos_capture_view.QFileDialog.getExistingDirectory",
+        return_value=str(exports_dir()),
+    ), patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.information"):
+        view._on_export()
+
+    with patch(
+        "app.ui.abogado.requerimientos_capture_view.QMessageBox.warning",
+        return_value=QMessageBox.StandardButton.No,
+    ) as mock_warn:
+        view._on_unlock_edit()
+
+    mock_warn.assert_called_once()
+    assert req_repo.get_batch(batch_id)["finalizado"] == 1
+    assert view._current_batch_finalizado is True
+
+
+def test_unlock_edit_after_export_confirmed_unlocks_and_moves_to_exportados_tab(qapp, db):
+    from app.utils.paths import exports_dir
+
+    _, abogado, batch_id = _make_agente_abogado_with_batch()
+    view = RequerimientosCaptureView(abogado)
+    view._load_batch(batch_id)
+
+    with patch(
+        "app.ui.abogado.requerimientos_capture_view.RequerimientosCaptureView._ask_export_choice",
+        return_value="only",
+    ), patch(
+        "app.ui.abogado.requerimientos_capture_view.QFileDialog.getExistingDirectory",
+        return_value=str(exports_dir()),
+    ), patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.information"):
+        view._on_export()
+
+    with patch(
+        "app.ui.abogado.requerimientos_capture_view.QMessageBox.warning",
+        return_value=QMessageBox.StandardButton.Yes,
+    ):
+        view._on_unlock_edit()
+
+    assert req_repo.get_batch(batch_id)["finalizado"] == 0
+    assert view._current_batch_finalizado is False
+    assert view.exportados_list.count() == 1
+    assert view.exportados_list.item(0).data(1000) == batch_id
+    assert view.finalizados_list.count() == 0
+
+
+def test_unlock_edit_without_prior_export_does_not_warn(qapp, db):
+    # Ya cubierto funcionalmente por test_unlock_edit_re_enables_widgets, pero
+    # aquí se confirma explícitamente que NO aparece la advertencia de
+    # "ya exportado" cuando el lote sólo se finalizó a mano sin exportarse.
+    _, abogado, batch_id = _make_agente_abogado_with_batch()
+    view = RequerimientosCaptureView(abogado)
+    view._load_batch(batch_id)
+
+    with patch(
+        "app.ui.abogado.requerimientos_capture_view.QMessageBox.question",
+        return_value=QMessageBox.StandardButton.Yes,
+    ):
+        view._on_finalize()
+
+    with patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.warning") as mock_warn:
+        view._on_unlock_edit()
+
+    mock_warn.assert_not_called()
+    assert req_repo.get_batch(batch_id)["finalizado"] == 0
+
+
+def test_batches_split_into_tabs_by_state(qapp, db):
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente Uno", email="a@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    abogado = users_repo.create_user(
+        username="abogado1", role=ROLE_ABOGADO, full_name="Abogado Uno", email="b@b.com",
+        auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
+    )
+    pending_id = req_repo.create_batch(abogado_id=abogado.id, agente_id=agente.id)
+
+    exported_id = req_repo.create_batch(abogado_id=abogado.id, agente_id=agente.id)
+    req_repo.set_batch_status(exported_id, "EXPORTADO")
+
+    finalized_id = req_repo.create_batch(abogado_id=abogado.id, agente_id=agente.id)
+    req_repo.set_batch_finalizado(finalized_id, True)
+
+    view = RequerimientosCaptureView(abogado)
+
+    assert view.pendientes_list.count() == 1
+    assert view.pendientes_list.item(0).data(1000) == pending_id
+    assert view.exportados_list.count() == 1
+    assert view.exportados_list.item(0).data(1000) == exported_id
+    assert view.finalizados_list.count() == 1
+    assert view.finalizados_list.item(0).data(1000) == finalized_id
+
+
+# --- Buscar fila por FOLIO/CTA PREDIAL/CONTRIBUYENTE -----------------------------------
+
+def test_search_by_folio_selects_matching_row(qapp, db):
+    _, abogado, batch_id = _make_agente_abogado_with_batch()
+    req_repo.add_rows(batch_id, [
+        {"folio": "F-002", "cta_predial": "CP-002", "contribuyente": "María López", "domicilio": "Calle 2"}
+    ])
+    view = RequerimientosCaptureView(abogado)
+    view._load_batch(batch_id)
+
+    view.search_input.setText("f-002")
+    view._on_search()
+
+    assert view.table.currentRow() == 1
+
+
+def test_search_by_contribuyente_selects_matching_row(qapp, db):
+    _, abogado, batch_id = _make_agente_abogado_with_batch()
+    req_repo.add_rows(batch_id, [
+        {"folio": "F-002", "cta_predial": "CP-002", "contribuyente": "María López", "domicilio": "Calle 2"}
+    ])
+    view = RequerimientosCaptureView(abogado)
+    view._load_batch(batch_id)
+
+    view.search_field_combo.setCurrentIndex(2)  # CONTRIBUYENTE
+    view.search_input.setText("lópez")
+    view._on_search()
+
+    assert view.table.currentRow() == 1
+
+
+def test_search_no_match_shows_information(qapp, db):
+    _, abogado, batch_id = _make_agente_abogado_with_batch()
+    view = RequerimientosCaptureView(abogado)
+    view._load_batch(batch_id)
+
+    view.search_input.setText("no existe en ninguna fila")
+    with patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.information") as mock_info:
+        view._on_search()
+
+    mock_info.assert_called_once()

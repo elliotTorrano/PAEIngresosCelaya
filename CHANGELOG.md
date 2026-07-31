@@ -1,5 +1,23 @@
 # Historial de versiones — Sistema PAE
 
+## 0.17.0
+
+- **Buscador de filas (Abogado y Agente)**: nuevo botón "Buscar" en la
+  captura del Abogado y en la sección de revisión del Agente, que permite
+  elegir el campo (FOLIO, CTA PREDIAL o CONTRIBUYENTE), escribir un texto y
+  posicionarse directamente en la fila que coincide, resaltándola
+  brevemente. Si no hay coincidencias, avisa que no se encontró nada.
+- **Pestañas de lotes para el Abogado**: la lista de lotes ahora se
+  organiza en tres pestañas -- Pendientes, Exportados y Finalizados -- y
+  cada lote se ubica solo en la que le corresponde según su estado actual,
+  sin intervención manual.
+- **Bloqueo automático al exportar**: en cuanto el Abogado exporta un lote
+  queda bloqueado de inmediato (igual que "Finalizar captura"), para
+  evitar ediciones accidentales después de entregado. Para editarlo de
+  nuevo se usa "Editar captura", que ahora advierte explícitamente cuando
+  el lote ya se había exportado antes -- el archivo ya entregado no se
+  actualiza solo, así que hay que volver a exportarlo tras corregir.
+
 ## 0.16.1
 
 - **Corregido: texto sin opacidad en la pantalla de login**. Las etiquetas

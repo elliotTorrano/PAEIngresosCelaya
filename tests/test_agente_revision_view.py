@@ -143,3 +143,52 @@ def test_simulate_mode_blocks_import_procede_and_export(qapp, db, tmp_path):
         view._on_export_revision()
     mock_info2.assert_called_once()
     assert "Simulación" in mock_info2.call_args[0][1]
+
+
+# --- Buscar fila por FOLIO/CTA PREDIAL/CONTRIBUYENTE -----------------------------------
+
+def _rows_for_search():
+    return [
+        {
+            "folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1",
+            "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
+            "fecha_notificacion": None, "quien_recibe": None, "quien_recibe_nombre": None,
+        },
+        {
+            "folio": "F-002", "cta_predial": "CP-002", "contribuyente": "María López", "domicilio": "Calle 2",
+            "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
+            "fecha_notificacion": None, "quien_recibe": None, "quien_recibe_nombre": None,
+        },
+    ]
+
+
+def test_search_revision_by_contribuyente_selects_matching_row(qapp, db):
+    agente = _make_agente_abogado()
+    revisiones_repo.add_revision_rows(
+        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None, abogado_id=None,
+        rows=_rows_for_search(),
+    )
+    view = RequerimientosImportView(agente)
+
+    view.revision_search_field_combo.setCurrentIndex(
+        view.revision_search_field_combo.findText("CONTRIBUYENTE")
+    )
+    view.revision_search_input.setText("lópez")
+    view._on_search_revision()
+
+    assert view.revision_table.currentRow() == 1
+
+
+def test_search_revision_no_match_shows_information(qapp, db):
+    agente = _make_agente_abogado()
+    revisiones_repo.add_revision_rows(
+        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None, abogado_id=None,
+        rows=_rows_for_search(),
+    )
+    view = RequerimientosImportView(agente)
+    view.revision_search_input.setText("no existe en ninguna fila")
+
+    with patch("app.ui.agente.requerimientos_import_view.QMessageBox.information") as mock_info:
+        view._on_search_revision()
+
+    mock_info.assert_called_once()
