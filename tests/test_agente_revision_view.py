@@ -47,10 +47,30 @@ def test_import_revision_persists_rows_and_refreshes_table(qapp, db, tmp_path):
     assert view.revision_table.rowCount() == 1
 
 
+def test_import_revision_stores_and_displays_abogado_id(qapp, db, tmp_path):
+    agente = _make_agente_abogado()
+    abogado = users_repo.list_by_role(ROLE_ABOGADO)[0]
+    path = tmp_path / "captura.mcdiep"
+    _write_captura_file(path)
+
+    view = RequerimientosImportView(agente)
+    with patch(
+        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileName",
+        return_value=(str(path), ""),
+    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+        view._on_import_revision()
+
+    rows = revisiones_repo.list_revision_rows(agente.id)
+    assert rows[0].abogado_id == abogado.id
+
+    id_col = len(HEADERS_ABOGADO) + 1  # a la derecha de la columna Procede
+    assert view.revision_table.item(0, id_col).text() == str(abogado.id)
+
+
 def test_procede_combo_change_persists(qapp, db):
     agente = _make_agente_abogado()
     revisiones_repo.add_revision_rows(
-        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None,
+        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None, abogado_id=None,
         rows=[{
             "folio": "F-001", "cta_predial": None, "contribuyente": None, "domicilio": None,
             "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
@@ -73,7 +93,7 @@ def test_export_revision_writes_file(qapp, db, tmp_path):
 
     agente = _make_agente_abogado()
     revisiones_repo.add_revision_rows(
-        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None,
+        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None, abogado_id=None,
         rows=[{
             "folio": "F-001", "cta_predial": None, "contribuyente": None, "domicilio": None,
             "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
@@ -107,7 +127,7 @@ def test_simulate_mode_blocks_import_procede_and_export(qapp, db, tmp_path):
     # Fila real preexistente (de otra sesión no-simulada) para probar que el
     # cambio de PROCEDE en modo simulación no persiste.
     revisiones_repo.add_revision_rows(
-        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None,
+        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None, abogado_id=None,
         rows=[{
             "folio": "F-001", "cta_predial": None, "contribuyente": None, "domicilio": None,
             "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,

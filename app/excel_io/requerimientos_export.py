@@ -24,7 +24,7 @@ HEADERS_ABOGADO = HEADERS_AGENTE + [
     "Quién recibe el citatorio",
     "Nombre de quien recibe la notificación",
 ]
-HEADERS_REVISION = HEADERS_ABOGADO + ["Procede"]
+HEADERS_REVISION = HEADERS_ABOGADO + ["Procede", "ID Abogado"]
 
 
 def export_for_abogado(rows: list[dict], output_path: Path, *, agente: User, abogado: User, private_key) -> None:
@@ -115,6 +115,7 @@ def export_revision(rows: list, output_path: Path) -> None:
                 row.quien_recibe,
                 row.quien_recibe_nombre,
                 row.procede,
+                row.abogado_id,
             ]
         )
     workbook.save(output_path)

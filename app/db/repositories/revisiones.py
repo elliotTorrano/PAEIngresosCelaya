@@ -18,6 +18,7 @@ class RevisionRow:
     agente_id: int
     source_filename: str
     abogado_nombre: str | None
+    abogado_id: int | None
     folio: str | None
     cta_predial: str | None
     contribuyente: str | None
@@ -38,6 +39,7 @@ class RevisionRow:
             agente_id=row["agente_id"],
             source_filename=row["source_filename"],
             abogado_nombre=row["abogado_nombre"],
+            abogado_id=row["abogado_id"],
             folio=row["folio"],
             cta_predial=row["cta_predial"],
             contribuyente=row["contribuyente"],
@@ -53,17 +55,20 @@ class RevisionRow:
         )
 
 
-def add_revision_rows(*, agente_id: int, source_filename: str, abogado_nombre: str | None, rows: list[dict]) -> None:
+def add_revision_rows(
+    *, agente_id: int, source_filename: str, abogado_nombre: str | None, abogado_id: int | None,
+    rows: list[dict],
+) -> None:
     conn = get_connection()
     conn.executemany(
         """
         INSERT INTO revision_rows (
-            agente_id, source_filename, abogado_nombre,
+            agente_id, source_filename, abogado_nombre, abogado_id,
             folio, cta_predial, contribuyente, domicilio,
             fecha_citatorio, recibe_citatorio, recibe_citatorio_nombre,
             fecha_notificacion, quien_recibe, quien_recibe_nombre
         ) VALUES (
-            :agente_id, :source_filename, :abogado_nombre,
+            :agente_id, :source_filename, :abogado_nombre, :abogado_id,
             :folio, :cta_predial, :contribuyente, :domicilio,
             :fecha_citatorio, :recibe_citatorio, :recibe_citatorio_nombre,
             :fecha_notificacion, :quien_recibe, :quien_recibe_nombre
@@ -75,6 +80,7 @@ def add_revision_rows(*, agente_id: int, source_filename: str, abogado_nombre: s
                 "agente_id": agente_id,
                 "source_filename": source_filename,
                 "abogado_nombre": abogado_nombre,
+                "abogado_id": abogado_id,
             }
             for r in rows
         ],

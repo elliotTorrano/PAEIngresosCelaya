@@ -83,9 +83,14 @@ class RequerimientosImportView(QWidget):
         self.count_label = QLabel("Filas importadas: 0")
         layout.addWidget(self.count_label)
 
+        self.files_label = QLabel("Archivos en este lote: (ninguno)")
+        self.files_label.setWordWrap(True)
+        layout.addWidget(self.files_label)
+
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["FOLIO", "CTA PREDIAL", "CONTRIBUYENTE", "DOMICILIO"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.table)
 
@@ -111,7 +116,8 @@ class RequerimientosImportView(QWidget):
 
         self.revision_table = QTableWidget(0, len(HEADERS_REVISION))
         self.revision_table.setHorizontalHeaderLabels(HEADERS_REVISION)
-        self.revision_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.revision_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.revision_table.horizontalHeader().setStretchLastSection(True)
         self.revision_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         revision_layout.addWidget(self.revision_table)
 
@@ -194,14 +200,21 @@ class RequerimientosImportView(QWidget):
 
     def _refresh_preview(self) -> None:
         self.count_label.setText(f"Filas importadas: {len(self._rows)}")
-        self.table.setRowCount(0)
-        for row in self._rows:
-            r = self.table.rowCount()
-            self.table.insertRow(r)
-            self.table.setItem(r, 0, QTableWidgetItem(row["folio"] or ""))
-            self.table.setItem(r, 1, QTableWidgetItem(row["cta_predial"] or ""))
-            self.table.setItem(r, 2, QTableWidgetItem(row["contribuyente"] or ""))
-            self.table.setItem(r, 3, QTableWidgetItem(row["domicilio"] or ""))
+        if self._source_filenames:
+            self.files_label.setText("Archivos en este lote: " + ", ".join(self._source_filenames))
+        else:
+            self.files_label.setText("Archivos en este lote: (ninguno)")
+
+        self.table.setUpdatesEnabled(False)
+        try:
+            self.table.setRowCount(len(self._rows))
+            for r, row in enumerate(self._rows):
+                self.table.setItem(r, 0, QTableWidgetItem(row["folio"] or ""))
+                self.table.setItem(r, 1, QTableWidgetItem(row["cta_predial"] or ""))
+                self.table.setItem(r, 2, QTableWidgetItem(row["contribuyente"] or ""))
+                self.table.setItem(r, 3, QTableWidgetItem(row["domicilio"] or ""))
+        finally:
+            self.table.setUpdatesEnabled(True)
 
     def _on_export(self) -> None:
         if not self._rows:
@@ -218,6 +231,14 @@ class RequerimientosImportView(QWidget):
                 "No se guardó ni exportó nada de verdad.",
             )
         else:
+            proceed = QMessageBox.question(
+                self, "Confirmar exportación",
+                f"Se exportarán {len(self._rows)} filas para {abogado.full_name}, con datos de "
+                "los siguientes archivos:\n\n" + "\n".join(self._source_filenames) + "\n\n¿Continuar?",
+            )
+            if proceed != QMessageBox.StandardButton.Yes:
+                return
+
             if not users_repo.has_certificate(self.agente_user):
                 QMessageBox.warning(
                     self, "Sin certificado registrado",
@@ -235,17 +256,30 @@ class RequerimientosImportView(QWidget):
             if confirm_dialog.exec() != QDialog.DialogCode.Accepted:
                 return
 
+            fecha = datetime.now().strftime("%d_%m_%Y")
+            filename = f"LISTA DEL {fecha} {_sanitize_filename(abogado.full_name)}{mcdiep_format.EXTENSION}"
+            folder = QFileDialog.getExistingDirectory(
+                self, "Elegir carpeta para guardar el archivo exportado", str(exports_dir())
+            )
+            if not folder:
+                return
+            output_path = Path(folder) / filename
+
+            if output_path.exists():
+                overwrite = QMessageBox.question(
+                    self, "El archivo ya existe",
+                    f"Ya existe un archivo con ese nombre en la carpeta elegida:\n{output_path.name}"
+                    "\n\n¿Reemplazarlo?",
+                )
+                if overwrite != QMessageBox.StandardButton.Yes:
+                    return
+
             batch_id = req_repo.create_batch(abogado_id=abogado_id, agente_id=self.agente_user.id)
             req_repo.add_rows(batch_id, self._rows)
             req_repo.link_imported_files_to_batch(
                 agente_id=self.agente_user.id, filenames=self._source_filenames, batch_id=batch_id
             )
 
-            fecha = datetime.now().strftime("%d_%m_%Y")
-            output_path = (
-                exports_dir()
-                / f"LISTA DEL {fecha} {_sanitize_filename(abogado.full_name)}{mcdiep_format.EXTENSION}"
-            )
             export_for_abogado(
                 self._rows, output_path,
                 agente=self.agente_user, abogado=abogado, private_key=confirm_dialog.private_key,
@@ -297,36 +331,43 @@ class RequerimientosImportView(QWidget):
             agente_id=self.agente_user.id,
             source_filename=Path(file_path).name,
             abogado_nombre=abogado.full_name if abogado else None,
+            abogado_id=abogado_id,
             rows=rows,
         )
         self._refresh_revision_table()
         QMessageBox.information(self, "Importado", f"Se importaron {len(rows)} filas para revisión.")
 
     def _refresh_revision_table(self) -> None:
-        self.revision_table.setRowCount(0)
         rows = revisiones_repo.list_revision_rows(self.agente_user.id)
-        for row in rows:
-            r = self.revision_table.rowCount()
-            self.revision_table.insertRow(r)
-            values = [
-                row.folio, row.cta_predial, row.contribuyente, row.domicilio,
-                row.fecha_citatorio, row.recibe_citatorio, row.recibe_citatorio_nombre,
-                row.fecha_notificacion, row.quien_recibe, row.quien_recibe_nombre,
-            ]
-            for col, value in enumerate(values):
-                item = QTableWidgetItem(value or "")
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                self.revision_table.setItem(r, col, item)
+        self.revision_table.setUpdatesEnabled(False)
+        try:
+            self.revision_table.setRowCount(len(rows))
+            for r, row in enumerate(rows):
+                values = [
+                    row.folio, row.cta_predial, row.contribuyente, row.domicilio,
+                    row.fecha_citatorio, row.recibe_citatorio, row.recibe_citatorio_nombre,
+                    row.fecha_notificacion, row.quien_recibe, row.quien_recibe_nombre,
+                ]
+                for col, value in enumerate(values):
+                    item = QTableWidgetItem(value or "")
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    self.revision_table.setItem(r, col, item)
 
-            procede_combo = QComboBox()
-            for option in PROCEDE_OPTIONS:
-                procede_combo.addItem(option, option or None)
-            if row.procede:
-                procede_combo.setCurrentIndex(procede_combo.findData(row.procede))
-            procede_combo.currentIndexChanged.connect(
-                lambda _i, row_id=row.id, combo=procede_combo: self._on_procede_changed(row_id, combo)
-            )
-            self.revision_table.setCellWidget(r, len(HEADERS_REVISION) - 1, procede_combo)
+                procede_combo = QComboBox()
+                for option in PROCEDE_OPTIONS:
+                    procede_combo.addItem(option, option or None)
+                if row.procede:
+                    procede_combo.setCurrentIndex(procede_combo.findData(row.procede))
+                procede_combo.currentIndexChanged.connect(
+                    lambda _i, row_id=row.id, combo=procede_combo: self._on_procede_changed(row_id, combo)
+                )
+                self.revision_table.setCellWidget(r, len(values), procede_combo)
+
+                id_item = QTableWidgetItem(str(row.abogado_id) if row.abogado_id else "")
+                id_item.setFlags(id_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.revision_table.setItem(r, len(values) + 1, id_item)
+        finally:
+            self.revision_table.setUpdatesEnabled(True)
 
     def _on_procede_changed(self, row_id: int, combo: QComboBox) -> None:
         if self.simulate:

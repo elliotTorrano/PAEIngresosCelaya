@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.12.0"
+__version__ = "0.14.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -104,4 +104,29 @@ VERSION_NOTES = {
               "atada a un Abogado específico -- al importarla se muestra quién firmó, y si "
               "la firma no es válida o es para otro Abogado, no se abre. La exportación del "
               "Abogado para el Agente también pasa a .mcdiep, sin firma.",
+    "0.12.1": "La exportación (Agente y Abogado) ahora deja elegir la carpeta de destino en "
+              "vez de guardar siempre en la carpeta interna del programa. Confirmado con "
+              "pruebas: la verificación del certificado al exportar como Agente rechaza "
+              "correctamente contraseña incorrecta y certificado de otra cuenta, sin crear "
+              "el lote en ninguno de los dos casos.",
+    "0.13.0": "Corregidas las fechas y horas que se mostraban en formato aaaa-mm-dd y en "
+              "hora UTC (no la del equipo) en Histórico, Trazabilidad, solicitudes de "
+              "reset y la lista de lotes del Abogado: ahora se muestran en hora local, "
+              "formato dd/mm/aaaa. Nuevo para el Abogado: botón 'Finalizar captura' que "
+              "guarda el lote como terminado y bloquea sus filas para que no se puedan "
+              "modificar por accidente; 'Editar captura' lo desbloquea de nuevo. La "
+              "exportación del Abogado ya sólo incluye las filas que capturó -- las que "
+              "quedaron vacías (tal como se importaron) ya no se exportan.",
+    "0.14.0": "Corregido: tras cancelar la selección de certificado en el login y "
+              "presionar 'Regresar', Enter dejaba de funcionar en la pantalla de usuario "
+              "(el clic sí funcionaba) -- el foco no se recuperaba a tiempo tras cerrar el "
+              "diálogo nativo. El Agente ahora ve la lista de archivos Excel cargados en el "
+              "lote y debe confirmarla antes de exportar (si cancela, no se pierde lo ya "
+              "cargado). Ambas exportaciones (Agente y Abogado) avisan y piden confirmar "
+              "antes de sobrescribir un archivo con el mismo nombre. La revisión de captura "
+              "del Abogado ahora guarda y muestra, hasta la derecha, el ID del Abogado al "
+              "que pertenece. Las columnas de las tablas del Agente ya se pueden "
+              "redimensionar arrastrando el borde. Se optimizó el refresco de las tablas "
+              "grandes (import/revisión del Agente y captura del Abogado) para que no se "
+              "sientan lentas al crecer.",
 }

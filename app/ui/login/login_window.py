@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -111,7 +112,14 @@ class LoginWindow(QDialog):
         self.cert_path_label.setText("(ninguno seleccionado)")
         self.username_input.clear()
         self.stack.setCurrentIndex(0)
-        self.username_input.setFocus()
+        # setFocus() inmediato no siempre se aplica aquí -- en particular si
+        # justo antes se cerró un QFileDialog nativo (p. ej. "Regresar" tras
+        # cancelar la selección del certificado), la reactivación de la
+        # ventana todavía no terminó de procesarse y el foco se queda en
+        # ningún lado: Enter deja de disparar returnPressed aunque el clic
+        # del mouse en "Continuar" sí funcione. Diferirlo con singleShot(0)
+        # lo aplica después de que esos eventos pendientes se procesen.
+        QTimer.singleShot(0, self.username_input.setFocus)
 
     # --- Página 2: usuario + contraseña (Abogado) -------------------------------
     def _build_password_page(self) -> QWidget:

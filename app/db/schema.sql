@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS requerimiento_batches (
                           CHECK (status IN ('PENDIENTE_ABOGADO', 'CAPTURADO', 'EXPORTADO')),
     exported_agente_path  TEXT,
     exported_abogado_path TEXT,
+    finalizado            INTEGER NOT NULL DEFAULT 0,
     created_at            TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -68,6 +69,7 @@ CREATE TABLE IF NOT EXISTS revision_rows (
     agente_id                INTEGER NOT NULL REFERENCES users(id),
     source_filename          TEXT NOT NULL,
     abogado_nombre           TEXT,
+    abogado_id               INTEGER REFERENCES users(id),
     folio                    TEXT,
     cta_predial              TEXT,
     contribuyente            TEXT,

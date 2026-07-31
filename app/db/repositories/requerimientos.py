@@ -48,6 +48,18 @@ class RequerimientoRow:
             and bool(self.fecha_notificacion) and bool(self.quien_recibe)
         )
 
+    @property
+    def is_modified(self) -> bool:
+        """True si el Abogado capturó algo en esta fila (aunque sea parcial).
+        Se usa para excluir del export las filas que siguen exactamente como
+        se importaron."""
+        return any(
+            (
+                self.fecha_citatorio, self.recibe_citatorio, self.recibe_citatorio_nombre,
+                self.fecha_notificacion, self.quien_recibe, self.quien_recibe_nombre,
+            )
+        )
+
 
 def create_batch(*, abogado_id: int, agente_id: int) -> int:
     conn = get_connection()
@@ -193,6 +205,15 @@ def set_batch_status(batch_id: int, status: str) -> None:
     conn.execute(
         "UPDATE requerimiento_batches SET status = ?, updated_at = datetime('now') WHERE id = ?",
         (status, batch_id),
+    )
+    conn.commit()
+
+
+def set_batch_finalizado(batch_id: int, finalizado: bool) -> None:
+    conn = get_connection()
+    conn.execute(
+        "UPDATE requerimiento_batches SET finalizado = ?, updated_at = datetime('now') WHERE id = ?",
+        (1 if finalizado else 0, batch_id),
     )
     conn.commit()
 

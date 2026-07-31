@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QHeaderView, QLabel, QTableWidget, QTableWidgetIte
 from app.config import ROLE_AGENTE_PAE
 from app.db.repositories import requerimientos as req_repo
 from app.db.repositories.users import User
+from app.utils.dates import format_local_datetime
 
 HEADERS_AGENTE = ["Archivo", "Filas", "Abogado", "Fecha y hora"]
 HEADERS_ABOGADO = ["Archivo", "Filas", "Agente del PAE", "Fecha y hora"]
@@ -44,4 +45,4 @@ class HistoricoView(QWidget):
             self.table.setItem(r, 0, QTableWidgetItem(row["original_filename"]))
             self.table.setItem(r, 1, QTableWidgetItem(str(row["row_count"])))
             self.table.setItem(r, 2, QTableWidgetItem(row[other_key] or ""))
-            self.table.setItem(r, 3, QTableWidgetItem(row["imported_at"] or ""))
+            self.table.setItem(r, 3, QTableWidgetItem(format_local_datetime(row["imported_at"])))

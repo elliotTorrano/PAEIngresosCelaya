@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 
 from app.db.repositories import audit as audit_repo
 from app.db.repositories.users import User
+from app.utils.dates import format_local_datetime
 
 FILES_HEADERS = ["Archivo", "Filas", "Agente", "Abogado", "Importado (fecha y hora)"]
 BATCHES_HEADERS = ["Lote", "Agente", "Abogado", "Estado", "Filas", "Capturadas", "Creado"]
@@ -110,7 +111,7 @@ class AuditView(QWidget):
             self.files_table.setItem(r, 1, QTableWidgetItem(str(row["row_count"])))
             self.files_table.setItem(r, 2, QTableWidgetItem(row["agente_nombre"] or ""))
             self.files_table.setItem(r, 3, QTableWidgetItem(row["abogado_nombre"] or ""))
-            self.files_table.setItem(r, 4, QTableWidgetItem(row["imported_at"] or ""))
+            self.files_table.setItem(r, 4, QTableWidgetItem(format_local_datetime(row["imported_at"])))
 
     def _fill_batches(self, rows: list[sqlite3.Row]) -> None:
         self.batches_table.setRowCount(0)
@@ -123,4 +124,4 @@ class AuditView(QWidget):
             self.batches_table.setItem(r, 3, QTableWidgetItem(row["status"]))
             self.batches_table.setItem(r, 4, QTableWidgetItem(str(row["total_filas"])))
             self.batches_table.setItem(r, 5, QTableWidgetItem(str(row["filas_capturadas"])))
-            self.batches_table.setItem(r, 6, QTableWidgetItem(row["created_at"] or ""))
+            self.batches_table.setItem(r, 6, QTableWidgetItem(format_local_datetime(row["created_at"])))

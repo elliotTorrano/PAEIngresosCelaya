@@ -23,6 +23,7 @@ from app.auth.passwords import hash_password
 from app.config import CERT_ROLES, RESET_REASON_LABELS
 from app.db.repositories import reset_requests as reset_requests_repo
 from app.db.repositories.users import User
+from app.utils.dates import format_local_datetime
 from app.utils.paths import reset_requests_dir
 
 
@@ -74,7 +75,7 @@ class ResetRequestsView(QWidget):
             self.table.setItem(row, 0, QTableWidgetItem(r["username"]))
             self.table.setItem(row, 1, QTableWidgetItem(r["role"]))
             self.table.setItem(row, 2, QTableWidgetItem(RESET_REASON_LABELS.get(r["reason"], r["reason"])))
-            self.table.setItem(row, 3, QTableWidgetItem(r["requested_at"]))
+            self.table.setItem(row, 3, QTableWidgetItem(format_local_datetime(r["requested_at"])))
 
     def _on_import(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar solicitud", "", "JSON (*.json)")

@@ -1,4 +1,4 @@
-from app.config import AUTH_TYPE_CERTIFICADO, ROLE_AGENTE_PAE
+from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
 from app.db.repositories import revisiones as revisiones_repo
 from app.db.repositories import users as users_repo
 
@@ -10,12 +10,21 @@ def _make_agente():
     )
 
 
+def _make_abogado():
+    return users_repo.create_user(
+        username="abogado1", role=ROLE_ABOGADO, full_name="Abogado Uno", email="b@b.com",
+        auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
+    )
+
+
 def test_add_and_list_revision_rows(db):
     agente = _make_agente()
+    abogado = _make_abogado()
     revisiones_repo.add_revision_rows(
         agente_id=agente.id,
         source_filename="captura_abogado1.xlsx",
         abogado_nombre="Abogado Uno",
+        abogado_id=abogado.id,
         rows=[
             {
                 "folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1",
@@ -32,12 +41,13 @@ def test_add_and_list_revision_rows(db):
     assert rows[0].abogado_nombre == "Abogado Uno"
     assert rows[0].fecha_citatorio == "01/01/2026"
     assert rows[0].procede is None
+    assert rows[0].abogado_id == abogado.id
 
 
 def test_update_revision_procede(db):
     agente = _make_agente()
     revisiones_repo.add_revision_rows(
-        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None,
+        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None, abogado_id=None,
         rows=[{
             "folio": "F-001", "cta_predial": None, "contribuyente": None, "domicilio": None,
             "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
@@ -59,7 +69,7 @@ def test_list_revision_rows_filters_by_agente(db):
         auth_type=AUTH_TYPE_CERTIFICADO,
     )
     revisiones_repo.add_revision_rows(
-        agente_id=agente1.id, source_filename="a1.xlsx", abogado_nombre=None,
+        agente_id=agente1.id, source_filename="a1.xlsx", abogado_nombre=None, abogado_id=None,
         rows=[{
             "folio": "F1", "cta_predial": None, "contribuyente": None, "domicilio": None,
             "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
@@ -67,7 +77,7 @@ def test_list_revision_rows_filters_by_agente(db):
         }],
     )
     revisiones_repo.add_revision_rows(
-        agente_id=agente2.id, source_filename="a2.xlsx", abogado_nombre=None,
+        agente_id=agente2.id, source_filename="a2.xlsx", abogado_nombre=None, abogado_id=None,
         rows=[{
             "folio": "F2", "cta_predial": None, "contribuyente": None, "domicilio": None,
             "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,

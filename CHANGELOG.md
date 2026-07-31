@@ -1,5 +1,68 @@
 # Historial de versiones — Sistema PAE
 
+## 0.14.0
+
+- **Corregido: Enter dejaba de funcionar en el login tras "Regresar"**. Si se
+  cancelaba la selección del certificado y se presionaba "Regresar" para
+  escribir otro usuario, Enter no disparaba nada (el clic en "Continuar" sí
+  funcionaba) -- el foco del campo de usuario no se recuperaba a tiempo tras
+  cerrar el diálogo nativo de archivo. Se difiere el `setFocus()` para que se
+  aplique después de que esos eventos terminen de procesarse.
+- **Agente: lista visible de Excel del lote + confirmación antes de
+  exportar**. Ahora se muestra qué archivos están cargados en el lote actual.
+  Antes de exportar (LISTA DEL...) se pide confirmar con esa misma lista; si
+  se rechaza, no se exporta nada y lo ya cargado se conserva.
+- **Confirmación al sobrescribir un archivo existente**: tanto la
+  exportación del Agente como la del Abogado avisan si ya existe un archivo
+  con el mismo nombre en la carpeta elegida, y piden confirmar antes de
+  reemplazarlo.
+- **Revisión de captura del Abogado**: se agrega y muestra, en la columna
+  más a la derecha, el ID del Abogado al que pertenece cada fila importada
+  (además del nombre, que ya se mostraba).
+- **Columnas redimensionables** en las tablas de importación y revisión del
+  Agente -- antes el ancho era fijo (Stretch) y no se podía ajustar
+  arrastrando el borde.
+- **Optimización de tablas grandes**: el refresco de las tablas de
+  importación/revisión del Agente y de captura del Abogado ya no reconstruye
+  fila por fila con `insertRow()` -- se preasigna el tamaño y se desactivan
+  los repintados intermedios, notablemente más rápido con lotes grandes.
+
+## 0.13.0
+
+- **Corregidas las fechas/horas mal mostradas**: la base de datos guarda
+  los timestamps en UTC (`datetime('now')` de SQLite); las pantallas que
+  los mostraban lo hacían tal cual, en formato `aaaa-mm-dd` y sin
+  convertir a la hora local del equipo. Se agregó
+  `app/utils/dates.py::format_local_datetime`, que convierte a hora local
+  y formatea `dd/mm/aaaa hh:mm`. Aplicado en Histórico (Agente/Abogado),
+  Trazabilidad (Súper/Administrador), solicitudes de reset y la lista de
+  lotes del Abogado.
+- **Nuevo: "Finalizar captura" / "Editar captura" (Abogado)**. Al
+  terminar de capturar un lote, el Abogado puede marcarlo como
+  finalizado: queda guardado y sus filas se bloquean (no se pueden
+  modificar por accidente). El botón "Editar captura" aparece sólo
+  cuando el lote está finalizado y lo desbloquea de nuevo. La lista de
+  lotes muestra "FINALIZADO" junto a los que ya están en ese estado.
+- **La exportación del Abogado ahora sólo incluye las filas que
+  capturó**: las filas que quedaron exactamente como se importaron (sin
+  ningún dato de citatorio o notificación) ya no se incluyen en el
+  archivo exportado para el Agente del PAE.
+
+## 0.12.1
+
+- **Nuevo: la exportación (Agente y Abogado) ahora deja elegir la carpeta
+  de destino** en vez de guardar siempre en la carpeta interna del
+  programa -- útil para guardar directo en una USB o en una carpeta
+  específica. Si se cancela la selección de carpeta, no se crea el lote
+  ni se guarda nada, igual que al cancelar cualquier otro paso del
+  proceso.
+- Se confirmó (con pruebas nuevas) que la verificación del certificado al
+  exportar como Agente rechaza correctamente tanto una contraseña
+  incorrecta como un certificado válido de otra cuenta -- y que en
+  cualquiera de los dos casos no se llega a crear el lote ni a pedir la
+  carpeta de destino. También se confirmó que el Abogado no tiene ningún
+  diálogo de archivo que permita seleccionar un Excel: sólo `.mcdiep`.
+
 ## 0.12.0
 
 - **Nuevo formato propio `.mcdiep`** para el intercambio de Requerimientos

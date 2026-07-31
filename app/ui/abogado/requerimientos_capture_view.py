@@ -39,6 +39,7 @@ from app.db.repositories import users as users_repo
 from app.excel_io import mcdiep_format
 from app.excel_io.requerimientos_export import export_captured
 from app.excel_io.requerimientos_import import McdiepVerificationError, parse_agente_export_file
+from app.utils.dates import format_local_datetime
 from app.utils.paths import exports_dir
 
 (
@@ -61,6 +62,7 @@ class RequerimientosCaptureView(QWidget):
         self.abogado_user = abogado_user
         self.simulate = simulate
         self._current_batch_id: int | None = None
+        self._current_batch_finalizado: bool = False
         self._rows: list[req_repo.RequerimientoRow] = []
 
         layout = QVBoxLayout(self)
@@ -85,6 +87,13 @@ class RequerimientosCaptureView(QWidget):
         export_btn = QPushButton("Exportar")
         export_btn.clicked.connect(self._on_export)
         import_row.addWidget(export_btn)
+        self.finalize_btn = QPushButton("Finalizar captura")
+        self.finalize_btn.clicked.connect(self._on_finalize)
+        import_row.addWidget(self.finalize_btn)
+        self.edit_btn = QPushButton("Editar captura")
+        self.edit_btn.clicked.connect(self._on_unlock_edit)
+        self.edit_btn.setVisible(False)
+        import_row.addWidget(self.edit_btn)
         layout.addLayout(import_row)
 
         splitter = QSplitter()
@@ -95,7 +104,8 @@ class RequerimientosCaptureView(QWidget):
 
         self.table = QTableWidget(0, len(HEADERS))
         self.table.setHorizontalHeaderLabels(HEADERS)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         splitter.addWidget(self.table)
         layout.addWidget(splitter)
@@ -106,7 +116,10 @@ class RequerimientosCaptureView(QWidget):
     def _refresh_batch_list(self) -> None:
         self.batch_list.clear()
         for batch in req_repo.list_batches_for_abogado(self.abogado_user.id):
-            item = QListWidgetItem(f"Lote #{batch['id']} — {batch['status']} — {batch['created_at']}")
+            label = f"Lote #{batch['id']} — {batch['status']} — {format_local_datetime(batch['created_at'])}"
+            if batch["finalizado"]:
+                label += " — FINALIZADO"
+            item = QListWidgetItem(label)
             item.setData(1000, batch["id"])
             self.batch_list.addItem(item)
 
@@ -118,6 +131,10 @@ class RequerimientosCaptureView(QWidget):
     def _load_batch(self, batch_id: int) -> None:
         self._current_batch_id = batch_id
         self._rows = req_repo.list_rows(batch_id)
+        batch = req_repo.get_batch(batch_id)
+        self._current_batch_finalizado = bool(batch["finalizado"]) if batch else False
+        self.finalize_btn.setVisible(not self._current_batch_finalizado)
+        self.edit_btn.setVisible(self._current_batch_finalizado)
         self._refresh_table()
 
     # --- Importar ------------------------------------------------------------------
@@ -168,27 +185,29 @@ class RequerimientosCaptureView(QWidget):
 
     # --- Tabla de captura ------------------------------------------------------------
     def _refresh_table(self) -> None:
-        self.table.setRowCount(0)
-        for row in self._rows:
-            r = self.table.rowCount()
-            self.table.insertRow(r)
-            self.table.setItem(r, COL_FOLIO, QTableWidgetItem(row.folio or ""))
-            self.table.setItem(r, COL_CTA, QTableWidgetItem(row.cta_predial or ""))
-            self.table.setItem(r, COL_CONTRIB, QTableWidgetItem(row.contribuyente or ""))
-            self.table.setItem(r, COL_DOM, QTableWidgetItem(row.domicilio or ""))
+        self.table.setUpdatesEnabled(False)
+        try:
+            self.table.setRowCount(len(self._rows))
+            for r, row in enumerate(self._rows):
+                self.table.setItem(r, COL_FOLIO, QTableWidgetItem(row.folio or ""))
+                self.table.setItem(r, COL_CTA, QTableWidgetItem(row.cta_predial or ""))
+                self.table.setItem(r, COL_CONTRIB, QTableWidgetItem(row.contribuyente or ""))
+                self.table.setItem(r, COL_DOM, QTableWidgetItem(row.domicilio or ""))
 
-            self._build_capture_trio(
-                r, row.id,
-                date_col=COL_FECHA_CIT, combo_col=COL_RECIBE_CIT, name_col=COL_NOMBRE_CIT,
-                fecha_value=row.fecha_citatorio, quien_value=row.recibe_citatorio,
-                nombre_value=row.recibe_citatorio_nombre,
-            )
-            self._build_capture_trio(
-                r, row.id,
-                date_col=COL_FECHA_NOT, combo_col=COL_QUIEN_NOT, name_col=COL_NOMBRE_NOT,
-                fecha_value=row.fecha_notificacion, quien_value=row.quien_recibe,
-                nombre_value=row.quien_recibe_nombre,
-            )
+                self._build_capture_trio(
+                    r, row.id,
+                    date_col=COL_FECHA_CIT, combo_col=COL_RECIBE_CIT, name_col=COL_NOMBRE_CIT,
+                    fecha_value=row.fecha_citatorio, quien_value=row.recibe_citatorio,
+                    nombre_value=row.recibe_citatorio_nombre,
+                )
+                self._build_capture_trio(
+                    r, row.id,
+                    date_col=COL_FECHA_NOT, combo_col=COL_QUIEN_NOT, name_col=COL_NOMBRE_NOT,
+                    fecha_value=row.fecha_notificacion, quien_value=row.quien_recibe,
+                    nombre_value=row.quien_recibe_nombre,
+                )
+        finally:
+            self.table.setUpdatesEnabled(True)
 
     def _build_capture_trio(
         self, table_row: int, row_id: int, *, date_col: int, combo_col: int, name_col: int,
@@ -201,6 +220,7 @@ class RequerimientosCaptureView(QWidget):
             date_edit.setDate(QDate.fromString(fecha_value, "dd/MM/yyyy"))
         else:
             date_edit.setDate(QDate.currentDate())
+        date_edit.setEnabled(not self._current_batch_finalizado)
         date_edit.dateChanged.connect(lambda _d, rid=row_id: self._save_row(rid))
         self.table.setCellWidget(table_row, date_col, date_edit)
 
@@ -210,10 +230,11 @@ class RequerimientosCaptureView(QWidget):
         quien_combo.addItem(QUIEN_RECIBE_NOMBRE, QUIEN_RECIBE_NOMBRE)
         if quien_value:
             quien_combo.setCurrentIndex(quien_combo.findData(quien_value))
+        quien_combo.setEnabled(not self._current_batch_finalizado)
         self.table.setCellWidget(table_row, combo_col, quien_combo)
 
         nombre_edit = QLineEdit(nombre_value or "")
-        nombre_edit.setEnabled(quien_value == QUIEN_RECIBE_NOMBRE)
+        nombre_edit.setEnabled(quien_value == QUIEN_RECIBE_NOMBRE and not self._current_batch_finalizado)
         self.table.setCellWidget(table_row, name_col, nombre_edit)
 
         quien_combo.currentIndexChanged.connect(
@@ -241,6 +262,8 @@ class RequerimientosCaptureView(QWidget):
         self._save_row(row_id)
 
     def _save_row(self, row_id: int) -> None:
+        if self._current_batch_finalizado and not self.simulate:
+            return
         table_row = self._table_row_for_id(row_id)
         if table_row is None:
             return
@@ -314,6 +337,50 @@ class RequerimientosCaptureView(QWidget):
 
         QTimer.singleShot(1000, revert)
 
+    # --- Finalizar / editar --------------------------------------------------------------
+    def _on_finalize(self) -> None:
+        if self._current_batch_id is None:
+            QMessageBox.warning(self, "Nada que finalizar", "Seleccione un lote primero.")
+            return
+        if self.simulate:
+            QMessageBox.information(
+                self, "No disponible en simulación",
+                "En modo simulación no se puede finalizar ni desbloquear un lote.",
+            )
+            return
+
+        reply = QMessageBox.question(
+            self, "Finalizar captura",
+            "¿Finalizar la captura de este lote? No se podrán modificar las filas hasta "
+            "que use 'Editar captura' para desbloquearlo.",
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        req_repo.set_batch_finalizado(self._current_batch_id, True)
+        self._current_batch_finalizado = True
+        self.finalize_btn.setVisible(False)
+        self.edit_btn.setVisible(True)
+        self._refresh_table()
+        self._refresh_batch_list()
+
+    def _on_unlock_edit(self) -> None:
+        if self._current_batch_id is None:
+            return
+        if self.simulate:
+            QMessageBox.information(
+                self, "No disponible en simulación",
+                "En modo simulación no se puede finalizar ni desbloquear un lote.",
+            )
+            return
+
+        req_repo.set_batch_finalizado(self._current_batch_id, False)
+        self._current_batch_finalizado = False
+        self.finalize_btn.setVisible(True)
+        self.edit_btn.setVisible(False)
+        self._refresh_table()
+        self._refresh_batch_list()
+
     # --- Exportar ------------------------------------------------------------------------
     def _ask_export_choice(self) -> str:
         """Devuelve 'email', 'only' o 'cancel'. Aislado en su propio método para
@@ -345,16 +412,37 @@ class RequerimientosCaptureView(QWidget):
             )
             return
 
+        rows_to_export = [row for row in self._rows if row.is_modified]
+        if not rows_to_export:
+            QMessageBox.warning(
+                self, "Nada que exportar",
+                "Ninguna fila de este lote tiene captura registrada todavía.",
+            )
+            return
+
         choice = self._ask_export_choice()
         if choice == "cancel":
             return
 
         fecha = datetime.now().strftime("%d_%m_%Y")
-        output_path = (
-            exports_dir()
-            / f"requerimientos_capturado_lote{self._current_batch_id} ENTREGA {fecha}{mcdiep_format.EXTENSION}"
+        filename = f"requerimientos_capturado_lote{self._current_batch_id} ENTREGA {fecha}{mcdiep_format.EXTENSION}"
+        folder = QFileDialog.getExistingDirectory(
+            self, "Elegir carpeta para guardar el archivo exportado", str(exports_dir())
         )
-        export_captured(self._rows, output_path)
+        if not folder:
+            return
+        output_path = Path(folder) / filename
+
+        if output_path.exists():
+            overwrite = QMessageBox.question(
+                self, "El archivo ya existe",
+                f"Ya existe un archivo con ese nombre en la carpeta elegida:\n{output_path.name}"
+                "\n\n¿Reemplazarlo?",
+            )
+            if overwrite != QMessageBox.StandardButton.Yes:
+                return
+
+        export_captured(rows_to_export, output_path)
         req_repo.set_batch_export_path(self._current_batch_id, abogado_path=str(output_path))
         req_repo.set_batch_status(self._current_batch_id, BATCH_STATUS_EXPORTADO)
         self._refresh_batch_list()
