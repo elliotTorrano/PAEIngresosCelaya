@@ -346,6 +346,94 @@ def test_migration_v8_creates_revision_imports_and_backfills_existing_rows(tmp_p
         connection_module._connection = None
 
 
+def test_migration_v9_adds_status_and_recomputes_fully_reviewed_imports(tmp_path, monkeypatch):
+    db_file = tmp_path / "v8.db"
+    monkeypatch.setattr(connection_module, "db_path", lambda: db_file)
+    connection_module._connection = None
+
+    # Simula una base v8: revision_imports sin status/status_changed_at, con
+    # un import completamente revisado (bajo el esquema viejo, "revisado" era
+    # sólo calculado) y otro a medias.
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+    conn.execute("INSERT INTO schema_version (version) VALUES (8)")
+    conn.execute(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL, full_name TEXT NOT NULL, email TEXT, auth_type TEXT NOT NULL,
+            password_hash TEXT, password_salt TEXT, cert_public_pem TEXT, cert_serial TEXT,
+            must_change_password INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO users (id, username, role, full_name, auth_type) VALUES (1, 'agente1', 'AGENTE_PAE', 'Agente Uno', 'CERTIFICADO')"
+    )
+    conn.execute(
+        """
+        CREATE TABLE revision_imports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, agente_id INTEGER NOT NULL,
+            source_filename TEXT NOT NULL, abogado_nombre TEXT, abogado_id INTEGER,
+            imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE revision_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, agente_id INTEGER NOT NULL,
+            revision_import_id INTEGER, source_filename TEXT NOT NULL,
+            abogado_nombre TEXT, abogado_id INTEGER,
+            folio TEXT, cta_predial TEXT, contribuyente TEXT, domicilio TEXT,
+            fecha_citatorio TEXT, recibe_citatorio TEXT, recibe_citatorio_nombre TEXT,
+            fecha_notificacion TEXT, quien_recibe TEXT, quien_recibe_nombre TEXT,
+            procede TEXT, imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO revision_imports (id, agente_id, source_filename) VALUES (1, 1, 'completo.xlsx')"
+    )
+    conn.execute(
+        "INSERT INTO revision_imports (id, agente_id, source_filename) VALUES (2, 1, 'a_medias.xlsx')"
+    )
+    conn.execute(
+        "INSERT INTO revision_rows (agente_id, revision_import_id, source_filename, folio, procede) "
+        "VALUES (1, 1, 'completo.xlsx', 'F-001', 'PROCEDE')"
+    )
+    conn.execute(
+        "INSERT INTO revision_rows (agente_id, revision_import_id, source_filename, folio, procede) "
+        "VALUES (1, 2, 'a_medias.xlsx', 'F-002', 'PROCEDE')"
+    )
+    conn.execute(
+        "INSERT INTO revision_rows (agente_id, revision_import_id, source_filename, folio, procede) "
+        "VALUES (1, 2, 'a_medias.xlsx', 'F-003', NULL)"
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        ensure_schema()
+
+        conn = connection_module.get_connection()
+        columns = [row["name"] for row in conn.execute("PRAGMA table_info(revision_imports)")]
+        assert "status" in columns
+        assert "status_changed_at" in columns
+
+        completo = conn.execute("SELECT status FROM revision_imports WHERE id = 1").fetchone()
+        assert completo["status"] == "PENDIENTE_REPORTE"
+
+        a_medias = conn.execute("SELECT status FROM revision_imports WHERE id = 2").fetchone()
+        assert a_medias["status"] == "EN_REVISION"
+
+        version = conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+        assert version == CURRENT_VERSION
+    finally:
+        connection_module._connection = None
+
+
 def test_fresh_schema_already_has_column(tmp_path, monkeypatch):
     db_file = tmp_path / "fresh.db"
     monkeypatch.setattr(connection_module, "db_path", lambda: db_file)

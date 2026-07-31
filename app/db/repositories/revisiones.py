@@ -19,6 +19,11 @@ from dataclasses import dataclass
 
 from app.db.connection import get_connection
 
+# Estado de un `revision_import` para el menú "Seguimiento" del Agente.
+STATUS_EN_REVISION = "EN_REVISION"
+STATUS_PENDIENTE_REPORTE = "PENDIENTE_REPORTE"
+STATUS_REPORTE_ENVIADO = "REPORTE_ENVIADO"
+
 
 @dataclass
 class RevisionImport:
@@ -28,6 +33,8 @@ class RevisionImport:
     abogado_nombre: str | None
     abogado_id: int | None
     imported_at: str
+    status: str
+    status_changed_at: str
     total_rows: int
     reviewed_rows: int
 
@@ -44,6 +51,8 @@ class RevisionImport:
             abogado_nombre=row["abogado_nombre"],
             abogado_id=row["abogado_id"],
             imported_at=row["imported_at"],
+            status=row["status"],
+            status_changed_at=row["status_changed_at"],
             total_rows=row["total_rows"],
             reviewed_rows=row["reviewed_rows"],
         )
@@ -148,6 +157,7 @@ def list_revision_imports(agente_id: int) -> list[RevisionImport]:
     rows = conn.execute(
         """
         SELECT ri.id, ri.agente_id, ri.source_filename, ri.abogado_nombre, ri.abogado_id, ri.imported_at,
+               ri.status, ri.status_changed_at,
                COUNT(rr.id) AS total_rows,
                SUM(CASE WHEN rr.procede IS NOT NULL THEN 1 ELSE 0 END) AS reviewed_rows
         FROM revision_imports ri
@@ -186,4 +196,38 @@ def list_revision_rows(agente_id: int) -> list[RevisionRow]:
 def update_revision_procede(row_id: int, procede: str | None) -> None:
     conn = get_connection()
     conn.execute("UPDATE revision_rows SET procede = ? WHERE id = ?", (procede, row_id))
+    row = conn.execute(
+        "SELECT revision_import_id FROM revision_rows WHERE id = ?", (row_id,)
+    ).fetchone()
+    if row is not None and row["revision_import_id"] is not None:
+        _sync_import_status(conn, row["revision_import_id"])
     conn.commit()
+
+
+def _sync_import_status(conn: sqlite3.Connection, revision_import_id: int) -> None:
+    """Recalcula EN_REVISION <-> PENDIENTE_REPORTE según cuántas filas del
+    import ya tienen PROCEDE/NO PROCEDE. REPORTE_ENVIADO es un estado final:
+    una vez enviado como reporte, editar una fila después no lo revierte solo."""
+    current = conn.execute(
+        "SELECT status FROM revision_imports WHERE id = ?", (revision_import_id,)
+    ).fetchone()
+    if current is None or current["status"] == STATUS_REPORTE_ENVIADO:
+        return
+
+    counts = conn.execute(
+        """
+        SELECT COUNT(*) AS total, SUM(CASE WHEN procede IS NOT NULL THEN 1 ELSE 0 END) AS reviewed
+        FROM revision_rows WHERE revision_import_id = ?
+        """,
+        (revision_import_id,),
+    ).fetchone()
+    new_status = (
+        STATUS_PENDIENTE_REPORTE
+        if counts["total"] and counts["total"] == counts["reviewed"]
+        else STATUS_EN_REVISION
+    )
+    if new_status != current["status"]:
+        conn.execute(
+            "UPDATE revision_imports SET status = ?, status_changed_at = datetime('now') WHERE id = ?",
+            (new_status, revision_import_id),
+        )

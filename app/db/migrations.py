@@ -8,7 +8,7 @@ from pathlib import Path
 from app.db.connection import get_connection
 
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
-CURRENT_VERSION = 8
+CURRENT_VERSION = 9
 
 # Migraciones incrementales para bases de datos creadas con una versión anterior
 # del esquema. schema.sql ya crea las tablas nuevas "desde cero" con todo esto
@@ -79,6 +79,28 @@ _MIGRATIONS: dict[int, str | list[str]] = {
                 LIMIT 1
             )
             WHERE revision_import_id IS NULL""",
+    ],
+    9: [
+        # Estado explícito por archivo importado (antes sólo se sabía si
+        # estaba "revisado" o no, calculado al vuelo) -- lo usa el nuevo
+        # menú "Seguimiento" del Agente para distinguir lo que falta
+        # revisar, lo revisado que falta enviar como reporte, y lo ya
+        # enviado (este último, terminal: no se recalcula solo).
+        "ALTER TABLE revision_imports ADD COLUMN status TEXT NOT NULL DEFAULT 'EN_REVISION'",
+        "ALTER TABLE revision_imports ADD COLUMN status_changed_at TEXT",
+        "UPDATE revision_imports SET status_changed_at = imported_at WHERE status_changed_at IS NULL",
+        # Recalcula el estado real de lo que ya estaba 100% revisado antes
+        # de esta migración (bajo el esquema viejo, sólo existía el
+        # concepto "revisado" calculado; ahora hay que fijarlo).
+        """UPDATE revision_imports
+            SET status = 'PENDIENTE_REPORTE'
+            WHERE id IN (
+                SELECT ri.id FROM revision_imports ri
+                JOIN revision_rows rr ON rr.revision_import_id = ri.id
+                GROUP BY ri.id
+                HAVING COUNT(rr.id) > 0
+                   AND SUM(CASE WHEN rr.procede IS NOT NULL THEN 1 ELSE 0 END) = COUNT(rr.id)
+            )""",
     ],
 }
 

@@ -1,5 +1,27 @@
 # Historial de versiones — Sistema PAE
 
+## 0.20.0
+
+- **Nuevo menú "Seguimiento" (Agente del PAE)**: reúne en una sola pantalla
+  los documentos en sus 4 etapas:
+  - **GENERADOS**: lo que se exportó desde "Generar Formato Requerimiento".
+  - **EN REVISIÓN**: capturas del Abogado importadas, todavía sin marcar
+    PROCEDE/NO PROCEDE en todas sus filas.
+  - **PENDIENTES DE ENVIAR COMO REPORTE**: ya se marcó cada fila, falta
+    enviarlo como reporte.
+  - **REPORTES ENVIADOS**: ya se envió como reporte.
+  
+  Cada archivo muestra cuándo se cargó y cuándo cambió de estatus por
+  última vez. Con doble clic o el botón de acción: en **GENERADOS**,
+  vuelve a exportar el documento (con confirmación, verificación de
+  certificado, y eligiendo dónde guardarlo y con qué nombre); en **EN
+  REVISIÓN**, lleva directo a "Revisar Formato Requerimiento" con ese
+  archivo abierto para continuar la captura. La exportación como reporte
+  (que movería PENDIENTES DE ENVIAR → REPORTES ENVIADOS) todavía no está
+  disponible -- se necesita más planeación para esa fase; por ahora esa
+  pestaña queda preparada pero vacía. También se preparó, sin desarrollar
+  todavía, el mismo seguimiento para el futuro Formato de Mandamientos.
+
 ## 0.19.0
 
 - **Corregido: "Revisar Formato Requerimiento" concatenaba archivos**. Al

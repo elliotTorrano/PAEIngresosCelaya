@@ -129,6 +129,24 @@ def list_batches_for_abogado(abogado_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def list_batches_for_agente(agente_id: int) -> list[sqlite3.Row]:
+    """Lotes que el Agente generó y exportó para un Abogado -- usado por el
+    menú "Seguimiento" (estado GENERADOS). Se filtra por exported_agente_path
+    porque un lote sólo existe una vez exportado (crear y exportar son un
+    mismo paso en `_on_export` de RequerimientosGenerarView)."""
+    conn = get_connection()
+    return conn.execute(
+        """
+        SELECT b.*, u.full_name AS abogado_nombre
+        FROM requerimiento_batches b
+        LEFT JOIN users u ON u.id = b.abogado_id
+        WHERE b.agente_id = ? AND b.exported_agente_path IS NOT NULL
+        ORDER BY b.created_at DESC
+        """,
+        (agente_id,),
+    ).fetchall()
+
+
 def get_batch(batch_id: int) -> sqlite3.Row | None:
     conn = get_connection()
     return conn.execute("SELECT * FROM requerimiento_batches WHERE id = ?", (batch_id,)).fetchone()

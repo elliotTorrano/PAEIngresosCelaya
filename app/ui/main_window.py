@@ -100,6 +100,9 @@ class MainWindow(QMainWindow):
             self._build_otros_menu()
             self._build_historico_menu()
 
+        if role == ROLE_AGENTE_PAE:
+            self._build_seguimiento_menu()
+
         if role == ROLE_SUPERUSUARIO:
             self._build_ver_como_menu()
 
@@ -206,6 +209,28 @@ class MainWindow(QMainWindow):
             self.tabs.addTab(widget, title)
             self._formato_widgets[key] = widget
         self.tabs.setCurrentWidget(widget)
+
+    # --- Menú "Seguimiento" (sólo Agente del PAE) -----------------------------------
+
+    def _build_seguimiento_menu(self) -> None:
+        menu = self.menuBar().addMenu("Seguimiento")
+        action = menu.addAction("Ver seguimiento")
+        action.triggered.connect(self._show_seguimiento_tab)
+
+    def _show_seguimiento_tab(self) -> None:
+        widget = self._otros_widgets.get("seguimiento")
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            from app.ui.agente.seguimiento_view import SeguimientoView
+
+            widget = SeguimientoView(self.user)
+            widget.continuar_revision_solicitada.connect(self._on_continuar_revision_solicitada)
+            self.tabs.addTab(widget, "Seguimiento")
+            self._otros_widgets["seguimiento"] = widget
+        self.tabs.setCurrentWidget(widget)
+
+    def _on_continuar_revision_solicitada(self, revision_import_id: int) -> None:
+        self._show_revisar_formato_tab()
+        self._formato_widgets["revisar_formato"]._load_import(revision_import_id)
 
     # --- Menú "Otros" (Agente del PAE / Abogado) ------------------------------------
 

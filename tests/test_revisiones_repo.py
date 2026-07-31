@@ -128,6 +128,53 @@ def test_list_revision_imports_reports_reviewed_progress(db):
     assert imports[0].is_reviewed is True
 
 
+def test_import_status_transitions_with_procede_changes(db):
+    from app.db.repositories.revisiones import (
+        STATUS_EN_REVISION,
+        STATUS_PENDIENTE_REPORTE,
+    )
+
+    agente = _make_agente()
+    import_id = _import_rows(agente.id, source_filename="lote1.xlsx", rows=[_row("F1"), _row("F2")])
+    rows = revisiones_repo.list_revision_rows_for_import(import_id)
+
+    imports = revisiones_repo.list_revision_imports(agente.id)
+    assert imports[0].status == STATUS_EN_REVISION
+
+    revisiones_repo.update_revision_procede(rows[0].id, "PROCEDE")
+    imports = revisiones_repo.list_revision_imports(agente.id)
+    assert imports[0].status == STATUS_EN_REVISION  # falta una fila
+
+    revisiones_repo.update_revision_procede(rows[1].id, "NO PROCEDE")
+    imports = revisiones_repo.list_revision_imports(agente.id)
+    assert imports[0].status == STATUS_PENDIENTE_REPORTE
+
+    # Si se destranca una fila (vuelve a quedar sin marcar), regresa a EN_REVISION.
+    revisiones_repo.update_revision_procede(rows[1].id, None)
+    imports = revisiones_repo.list_revision_imports(agente.id)
+    assert imports[0].status == STATUS_EN_REVISION
+
+
+def test_reported_status_does_not_revert_automatically(db):
+    from app.db.connection import get_connection
+    from app.db.repositories.revisiones import STATUS_REPORTE_ENVIADO
+
+    agente = _make_agente()
+    import_id = _import_rows(agente.id, source_filename="lote1.xlsx", rows=[_row("F1")])
+    row_id = revisiones_repo.list_revision_rows_for_import(import_id)[0].id
+    revisiones_repo.update_revision_procede(row_id, "PROCEDE")
+
+    # Simula que ya se envió como reporte (fase todavía no expuesta en la UI).
+    conn = get_connection()
+    conn.execute("UPDATE revision_imports SET status = ? WHERE id = ?", (STATUS_REPORTE_ENVIADO, import_id))
+    conn.commit()
+
+    # Editar una fila después de "enviado" no debe revertir el estado solo.
+    revisiones_repo.update_revision_procede(row_id, None)
+    imports = revisiones_repo.list_revision_imports(agente.id)
+    assert imports[0].status == STATUS_REPORTE_ENVIADO
+
+
 def test_list_revision_imports_filters_by_agente(db):
     agente1 = _make_agente()
     agente2 = users_repo.create_user(

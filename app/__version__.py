@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.19.0"
+__version__ = "0.20.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -177,4 +177,15 @@ VERSION_NOTES = {
               "Nueva pantalla previa con un combo Pendiente/Revisado: lista los archivos "
               "importados según si ya se marcó PROCEDE/NO PROCEDE en todas sus filas o no, "
               "para saber de un vistazo qué entregas del Abogado faltan por revisar.",
+    "0.20.0": "Nuevo menú 'Seguimiento' para el Agente del PAE: reúne en una sola pantalla "
+              "los documentos en sus 4 etapas -- GENERADOS (lo exportado en 'Generar "
+              "Formato'), EN REVISIÓN, PENDIENTES DE ENVIAR COMO REPORTE y REPORTES "
+              "ENVIADOS (estas 3 últimas, del ciclo de 'Revisar Formato') -- con la fecha "
+              "en que se cargó cada uno y la de su último cambio de estatus. Con doble "
+              "clic o el botón de acción: en GENERADOS, vuelve a exportar el documento "
+              "(pidiendo confirmación, certificado, y dónde guardarlo con qué nombre); en "
+              "EN REVISIÓN, abre ese archivo directamente en 'Revisar Formato "
+              "Requerimiento' para continuar marcando PROCEDE/NO PROCEDE. La exportación "
+              "como reporte (PENDIENTES DE ENVIAR -> REPORTES ENVIADOS) todavía no está "
+              "disponible -- se necesita más planeación para esa fase.",
 }

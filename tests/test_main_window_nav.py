@@ -168,6 +168,60 @@ def test_dynamic_tab_can_be_closed_and_reopened(qapp, db):
     assert "Generar Formato Requerimiento" in _tab_titles(window)
 
 
+# --- Menú "Seguimiento" (sólo Agente del PAE) ------------------------------------------
+
+def test_agente_gets_seguimiento_menu(qapp, db):
+    window = MainWindow(_make_agente())
+    menu_titles = [action.text() for action in window.menuBar().actions()]
+    assert "Seguimiento" in menu_titles
+
+
+def test_abogado_does_not_get_seguimiento_menu(qapp, db):
+    window = MainWindow(_make_abogado())
+    menu_titles = [action.text() for action in window.menuBar().actions()]
+    assert "Seguimiento" not in menu_titles
+
+
+def test_show_seguimiento_tab_adds_and_reuses(qapp, db):
+    window = MainWindow(_make_agente())
+
+    window._show_seguimiento_tab()
+    assert "Seguimiento" in _tab_titles(window)
+    assert window.tabs.currentWidget() is window._otros_widgets["seguimiento"]
+
+    window.tabs.setCurrentIndex(0)
+    window._show_seguimiento_tab()
+    assert _tab_titles(window).count("Seguimiento") == 1
+
+
+def test_continuar_revision_solicitada_switches_to_revisar_tab_and_loads_import(qapp, db):
+    from app.db.repositories import revisiones as revisiones_repo
+
+    agente = _make_agente()
+    revision_import_id = revisiones_repo.create_revision_import(
+        agente_id=agente.id, source_filename="lote1.mcdiep", abogado_nombre=None, abogado_id=None,
+    )
+    revisiones_repo.add_revision_rows(
+        agente_id=agente.id, revision_import_id=revision_import_id, source_filename="lote1.mcdiep",
+        abogado_nombre=None, abogado_id=None,
+        rows=[{
+            "folio": "F1", "cta_predial": None, "contribuyente": None, "domicilio": None,
+            "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
+            "fecha_notificacion": None, "quien_recibe": None, "quien_recibe_nombre": None,
+        }],
+    )
+
+    window = MainWindow(agente)
+    window._on_continuar_revision_solicitada(revision_import_id)
+
+    # El título de la pestaña queda con el nombre del archivo abierto (ver
+    # _on_revision_filename_changed), así que sólo se verifica el prefijo.
+    assert any(title.startswith("Revisar Formato Requerimiento") for title in _tab_titles(window))
+    widget = window._formato_widgets["revisar_formato"]
+    assert widget.revision_table.rowCount() == 1
+    assert window.tabs.currentWidget() is widget
+
+
 def test_super_gets_ver_como_menu_and_can_open_agente_simulation(qapp, db):
     agente = _make_agente()
     window = MainWindow(_make_super())

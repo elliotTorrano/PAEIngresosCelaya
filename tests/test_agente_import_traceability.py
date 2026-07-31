@@ -8,6 +8,7 @@ from app.auth.cert_auth import GENERIC_FAILURE_MESSAGE
 from app.auth.crypto_certs import generate_certificate_bundle, load_bundle
 from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
 from app.db.connection import get_connection
+from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import users as users_repo
 from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
 from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
@@ -360,6 +361,37 @@ def test_export_succeeds_with_correct_password_and_certificate(qapp, db, tmp_pat
 
     matches = list(dest_folder.glob("LISTA DEL *.mcdiep"))
     assert len(matches) == 1
+
+
+def test_export_succeeded_batch_appears_in_list_batches_for_agente(qapp, db, tmp_path):
+    agente, agente_pfx_path = _make_agente_abogado_with_pfx(tmp_path)
+    source_path = tmp_path / "lote.xlsx"
+    _write_valid_file(source_path)
+    dest_folder = tmp_path / "destino"
+    dest_folder.mkdir()
+
+    view = RequerimientosGenerarView(agente)
+    with patch(
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
+        return_value=([str(source_path)], ""),
+    ):
+        view._on_select_files()
+
+    with patch.object(
+        CertificateConfirmDialog, "exec", _make_confirm_exec(agente_pfx_path, "clave-agente")
+    ), patch(
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory",
+        return_value=str(dest_folder),
+    ), patch(
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
+        return_value=QMessageBox.StandardButton.Yes,
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.information"):
+        view._on_export()
+
+    batches = req_repo.list_batches_for_agente(agente.id)
+    assert len(batches) == 1
+    assert batches[0]["exported_agente_path"] is not None
+    assert batches[0]["abogado_nombre"] == "Abogado Uno"
 
 
 def test_export_cancelled_folder_picker_creates_no_batch(qapp, db, tmp_path):

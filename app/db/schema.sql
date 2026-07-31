@@ -65,12 +65,18 @@ CREATE TABLE IF NOT EXISTS requerimiento_rows (
 );
 
 CREATE TABLE IF NOT EXISTS revision_imports (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    agente_id        INTEGER NOT NULL REFERENCES users(id),
-    source_filename  TEXT NOT NULL,
-    abogado_nombre   TEXT,
-    abogado_id       INTEGER REFERENCES users(id),
-    imported_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    agente_id         INTEGER NOT NULL REFERENCES users(id),
+    source_filename   TEXT NOT NULL,
+    abogado_nombre    TEXT,
+    abogado_id        INTEGER REFERENCES users(id),
+    -- EN_REVISION: falta marcar PROCEDE/NO PROCEDE en alguna fila.
+    -- PENDIENTE_REPORTE: todas las filas ya se marcaron, falta enviarlo como reporte.
+    -- REPORTE_ENVIADO: ya se envió como reporte -- estado final, no se revierte solo.
+    status            TEXT NOT NULL DEFAULT 'EN_REVISION'
+                      CHECK (status IN ('EN_REVISION', 'PENDIENTE_REPORTE', 'REPORTE_ENVIADO')),
+    status_changed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    imported_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS revision_rows (
