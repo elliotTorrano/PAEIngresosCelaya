@@ -1,8 +1,10 @@
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import openpyxl
+from PySide6.QtWidgets import QDialog
 
+from app.auth.crypto_certs import generate_certificate_bundle, load_bundle
 from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
 from app.db.connection import get_connection
 from app.db.repositories import users as users_repo
@@ -24,15 +26,29 @@ def _make_agente_abogado():
         username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente Uno", email="a@a.com",
         auth_type=AUTH_TYPE_CERTIFICADO,
     )
+    pfx_bytes, cert_public_pem, cert_serial = generate_certificate_bundle(
+        username=agente.username, full_name=agente.full_name, password="clave-segura"
+    )
+    users_repo.set_certificate(agente.id, cert_public_pem=cert_public_pem, cert_serial=cert_serial)
+    agente = users_repo.get_by_id(agente.id)
+    private_key, _certificate = load_bundle(pfx_bytes, "clave-segura")
+
     users_repo.create_user(
         username="abogado1", role=ROLE_ABOGADO, full_name="Abogado Uno", email="b@b.com",
         auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
     )
-    return agente
+    return agente, private_key
+
+
+def _mock_confirm_dialog(private_key):
+    mock = MagicMock()
+    mock.exec.return_value = QDialog.DialogCode.Accepted
+    mock.private_key = private_key
+    return mock
 
 
 def test_selecting_a_file_logs_it_immediately(qapp, db, tmp_path):
-    agente = _make_agente_abogado()
+    agente, _private_key = _make_agente_abogado()
     path = tmp_path / "lote_julio.xlsx"
     _write_valid_file(path)
 
@@ -57,7 +73,7 @@ def test_selecting_a_file_logs_it_immediately(qapp, db, tmp_path):
 def test_reusing_same_filename_in_a_new_batch_is_not_blocked(qapp, db, tmp_path):
     """El histórico nunca bloquea: el mismo nombre puede volver a subirse el mes
     siguiente. Sólo se avisa si se repite DENTRO del mismo lote sin exportar."""
-    agente = _make_agente_abogado()
+    agente, private_key = _make_agente_abogado()
     path = tmp_path / "lote_mensual.xlsx"
     _write_valid_file(path)
 
@@ -70,7 +86,10 @@ def test_reusing_same_filename_in_a_new_batch_is_not_blocked(qapp, db, tmp_path)
         view._on_select_files()
     assert len(view._rows) == 1
 
-    with patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+    with patch(
+        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog",
+        return_value=_mock_confirm_dialog(private_key),
+    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
         view._on_export()
     assert view._rows == []
     assert view._source_filenames == []
@@ -98,7 +117,7 @@ def test_reusing_same_filename_in_a_new_batch_is_not_blocked(qapp, db, tmp_path)
 def test_export_filename_follows_lista_del_convention(qapp, db, tmp_path):
     from app.utils.paths import exports_dir
 
-    agente = _make_agente_abogado()
+    agente, private_key = _make_agente_abogado()
     path = tmp_path / "lote.xlsx"
     _write_valid_file(path)
 
@@ -109,9 +128,41 @@ def test_export_filename_follows_lista_del_convention(qapp, db, tmp_path):
     ):
         view._on_select_files()
 
-    with patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
+    with patch(
+        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog",
+        return_value=_mock_confirm_dialog(private_key),
+    ), patch("app.ui.agente.requerimientos_import_view.QMessageBox.information"):
         view._on_export()
 
     fecha = datetime.now().strftime("%d_%m_%Y")
-    expected = exports_dir() / f"LISTA DEL {fecha} Abogado Uno.xlsx"
+    expected = exports_dir() / f"LISTA DEL {fecha} Abogado Uno.mcdiep"
     assert expected.exists()
+
+
+def test_export_without_certificate_is_blocked(qapp, db, tmp_path):
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente Uno", email="a@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    users_repo.create_user(
+        username="abogado1", role=ROLE_ABOGADO, full_name="Abogado Uno", email="b@b.com",
+        auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
+    )
+    path = tmp_path / "lote.xlsx"
+    _write_valid_file(path)
+
+    view = RequerimientosImportView(agente)
+    with patch(
+        "app.ui.agente.requerimientos_import_view.QFileDialog.getOpenFileNames",
+        return_value=([str(path)], ""),
+    ):
+        view._on_select_files()
+
+    with patch("app.ui.agente.requerimientos_import_view.QMessageBox.warning") as mock_warning, patch(
+        "app.ui.agente.requerimientos_import_view.CertificateConfirmDialog"
+    ) as mock_confirm_cls:
+        view._on_export()
+
+    mock_warning.assert_called_once()
+    mock_confirm_cls.assert_not_called()
+    assert view._rows  # no se limpió: no se exportó nada

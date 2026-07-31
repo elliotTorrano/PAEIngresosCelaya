@@ -1,35 +1,40 @@
 from datetime import datetime
 from unittest.mock import patch
 
-import openpyxl
-
+from app.auth.crypto_certs import generate_certificate_bundle, load_bundle
 from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
 from app.db.connection import get_connection
 from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import users as users_repo
+from app.excel_io.requerimientos_export import export_for_abogado
 from app.ui.abogado.requerimientos_capture_view import RequerimientosCaptureView
 
 
-def _write_export_file(path):
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.append(["FOLIO", "CTA PREDIAL", "CONTRIBUYENTE", "DOMICILIO"])
-    ws.append(["F-001", "CP-001", "Juan Pérez", "Calle 1"])
-    wb.save(path)
-
-
-def test_abogado_import_logs_imported_file(qapp, db, tmp_path):
+def _make_agente_with_cert():
     agente = users_repo.create_user(
         username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente Uno", email="a@a.com",
         auth_type=AUTH_TYPE_CERTIFICADO,
     )
+    pfx_bytes, cert_public_pem, cert_serial = generate_certificate_bundle(
+        username=agente.username, full_name=agente.full_name, password="clave-segura"
+    )
+    users_repo.set_certificate(agente.id, cert_public_pem=cert_public_pem, cert_serial=cert_serial)
+    private_key, _certificate = load_bundle(pfx_bytes, "clave-segura")
+    return users_repo.get_by_id(agente.id), private_key
+
+
+def test_abogado_import_logs_imported_file(qapp, db, tmp_path):
+    agente, private_key = _make_agente_with_cert()
     abogado = users_repo.create_user(
         username="abogado1", role=ROLE_ABOGADO, full_name="Abogado Uno", email="b@b.com",
         auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
     )
 
-    export_path = tmp_path / "requerimientos_abogado1_lote1.xlsx"
-    _write_export_file(export_path)
+    export_path = tmp_path / "requerimientos_abogado1_lote1.mcdiep"
+    export_for_abogado(
+        [{"folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1"}],
+        export_path, agente=agente, abogado=abogado, private_key=private_key,
+    )
 
     view = RequerimientosCaptureView(abogado)
 
@@ -47,6 +52,37 @@ def test_abogado_import_logs_imported_file(qapp, db, tmp_path):
     assert rows[0]["original_filename"] == export_path.name
     assert rows[0]["row_count"] == 1
     assert rows[0]["imported_at"] is not None
+
+
+def test_abogado_import_rejects_file_signed_for_another_abogado(qapp, db, tmp_path):
+    agente, private_key = _make_agente_with_cert()
+    other_abogado = users_repo.create_user(
+        username="abogado1", role=ROLE_ABOGADO, full_name="Abogado Uno", email="b@b.com",
+        auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
+    )
+    this_abogado = users_repo.create_user(
+        username="abogado2", role=ROLE_ABOGADO, full_name="Abogado Dos", email="c@c.com",
+        auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
+    )
+
+    export_path = tmp_path / "para_otro.mcdiep"
+    export_for_abogado(
+        [{"folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1"}],
+        export_path, agente=agente, abogado=other_abogado, private_key=private_key,
+    )
+
+    view = RequerimientosCaptureView(this_abogado)
+
+    with patch(
+        "app.ui.abogado.requerimientos_capture_view.QFileDialog.getOpenFileName",
+        return_value=(str(export_path), ""),
+    ), patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.critical") as mock_critical:
+        view._on_import()
+
+    mock_critical.assert_called_once()
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM imported_files WHERE abogado_id = ?", (this_abogado.id,)).fetchall()
+    assert rows == []
 
 
 def _make_agente_abogado_with_batch():
@@ -82,7 +118,7 @@ def test_export_only_does_not_call_email(qapp, db):
 
     mock_email.assert_not_called()
     fecha = datetime.now().strftime("%d_%m_%Y")
-    expected = exports_dir() / f"requerimientos_capturado_lote{batch_id} ENTREGA {fecha}.xlsx"
+    expected = exports_dir() / f"requerimientos_capturado_lote{batch_id} ENTREGA {fecha}.mcdiep"
     assert expected.exists()
 
 

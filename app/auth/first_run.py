@@ -7,7 +7,14 @@ app/auth/seed_crypto.py y packaging/generate_seed.py). Así, sin importar en
 qué máquina o cuántas veces se ejecute el .exe, siempre se crea exactamente
 la misma cuenta de súper-usuario y de Administrador -- nunca se vuelve a
 preguntar, y el nombre/correo reales no quedan en texto plano dentro del .exe.
-"""
+
+Si el seed también trae `cert_public_pem`/`cert_serial` para el súper-usuario
+(generados una sola vez con packaging/generate_super_master_cert.py), esa
+cuenta queda con el certificado "maestro" ya registrado desde el primer
+arranque en CUALQUIER máquina -- el súper-usuario inicia sesión ahí con el
+mismo archivo .pfx de siempre, sin pasar por el enrolamiento. El Administrador
+nunca se siembra con certificado: sigue generando el suyo, propio de cada
+máquina, en su primer inicio de sesión."""
 
 from __future__ import annotations
 
@@ -46,10 +53,14 @@ def ensure_seed_accounts() -> None:
 
     if users_repo.count_by_role(ROLE_SUPERUSUARIO) == 0:
         su = seed["superusuario"]
-        users_repo.create_user(
+        user = users_repo.create_user(
             username=su["username"], role=ROLE_SUPERUSUARIO, full_name=su["full_name"],
             email=su["email"], auth_type=AUTH_TYPE_CERTIFICADO,
         )
+        cert_public_pem = su.get("cert_public_pem")
+        cert_serial = su.get("cert_serial")
+        if cert_public_pem and cert_serial:
+            users_repo.set_certificate(user.id, cert_public_pem=cert_public_pem, cert_serial=cert_serial)
 
     if users_repo.count_by_role(ROLE_ADMINISTRADOR) == 0:
         admin = seed["administrador"]

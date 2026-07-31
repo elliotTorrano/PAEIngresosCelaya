@@ -1,0 +1,127 @@
+import pytest
+
+from app.auth.crypto_certs import generate_certificate_bundle, load_bundle
+from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
+from app.db.repositories import users as users_repo
+from app.excel_io import mcdiep_format
+from app.excel_io.requerimientos_export import export_captured, export_for_abogado
+from app.excel_io.requerimientos_import import McdiepVerificationError, parse_agente_export_file
+
+
+def _make_agente_with_cert(username="agente1"):
+    agente = users_repo.create_user(
+        username=username, role=ROLE_AGENTE_PAE, full_name="Agente Uno", email="a@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    pfx_bytes, cert_public_pem, cert_serial = generate_certificate_bundle(
+        username=agente.username, full_name=agente.full_name, password="clave-segura"
+    )
+    users_repo.set_certificate(agente.id, cert_public_pem=cert_public_pem, cert_serial=cert_serial)
+    private_key, _certificate = load_bundle(pfx_bytes, "clave-segura")
+    return users_repo.get_by_id(agente.id), private_key
+
+
+def _make_abogado(username="abogado1"):
+    return users_repo.create_user(
+        username=username, role=ROLE_ABOGADO, full_name="Abogado Uno", email="b@b.com",
+        auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
+    )
+
+
+def test_valid_file_returns_rows_and_signer(tmp_path, db):
+    agente, private_key = _make_agente_with_cert()
+    abogado = _make_abogado()
+    path = tmp_path / "lista.mcdiep"
+    export_for_abogado(
+        [{"folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1"}],
+        path, agente=agente, abogado=abogado, private_key=private_key,
+    )
+
+    rows, signer = parse_agente_export_file(path, abogado=abogado)
+
+    assert len(rows) == 1
+    assert signer.id == agente.id
+
+
+def test_unknown_signer_is_rejected(tmp_path, db):
+    abogado = _make_abogado()
+    path = tmp_path / "fantasma.mcdiep"
+    mcdiep_format.write_envelope(
+        path,
+        mcdiep_format.McdiepEnvelope(
+            kind=mcdiep_format.KIND_AGENTE_TO_ABOGADO,
+            signer_username="no_existe",
+            target_username=abogado.username,
+            payload={"headers": [], "rows": []},
+            signature=b"cualquier-cosa",
+        ),
+    )
+
+    with pytest.raises(McdiepVerificationError, match="no existe"):
+        parse_agente_export_file(path, abogado=abogado)
+
+
+def test_signer_without_certificate_is_rejected(tmp_path, db):
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente Sin Cert", email="a@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    abogado = _make_abogado()
+    path = tmp_path / "sin_cert.mcdiep"
+    mcdiep_format.write_envelope(
+        path,
+        mcdiep_format.McdiepEnvelope(
+            kind=mcdiep_format.KIND_AGENTE_TO_ABOGADO,
+            signer_username=agente.username,
+            target_username=abogado.username,
+            payload={"headers": [], "rows": []},
+            signature=b"cualquier-cosa",
+        ),
+    )
+
+    with pytest.raises(McdiepVerificationError, match="certificado"):
+        parse_agente_export_file(path, abogado=abogado)
+
+
+def test_tampered_payload_invalidates_signature(tmp_path, db):
+    agente, private_key = _make_agente_with_cert()
+    abogado = _make_abogado()
+    path = tmp_path / "lista.mcdiep"
+    export_for_abogado(
+        [{"folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1"}],
+        path, agente=agente, abogado=abogado, private_key=private_key,
+    )
+
+    # Alguien edita el archivo ya firmado, cambiando una fila -- la firma
+    # sigue siendo la original, así que ya no coincide con el contenido.
+    envelope = mcdiep_format.read_envelope(path)
+    envelope.payload["rows"][0]["contribuyente"] = "Nombre Alterado"
+    mcdiep_format.write_envelope(path, envelope)
+
+    with pytest.raises(McdiepVerificationError, match="firma"):
+        parse_agente_export_file(path, abogado=abogado)
+
+
+def test_wrong_target_abogado_is_rejected(tmp_path, db):
+    agente, private_key = _make_agente_with_cert()
+    intended_abogado = _make_abogado("abogado1")
+    other_abogado = _make_abogado("abogado2")
+    path = tmp_path / "lista.mcdiep"
+    export_for_abogado(
+        [{"folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1"}],
+        path, agente=agente, abogado=intended_abogado, private_key=private_key,
+    )
+
+    with pytest.raises(McdiepVerificationError, match="abogado1"):
+        parse_agente_export_file(path, abogado=other_abogado)
+
+
+def test_wrong_kind_is_rejected(tmp_path, db):
+    """Un archivo de captura del Abogado (abogado_to_agente) no debe abrirse
+    como si fuera una lista del Agente (agente_to_abogado)."""
+    abogado = _make_abogado()
+    path = tmp_path / "captura.mcdiep"
+    export_captured([], path)
+
+    with pytest.raises(McdiepVerificationError):
+        parse_agente_export_file(path, abogado=abogado)

@@ -1,5 +1,54 @@
 # Historial de versiones — Sistema PAE
 
+## 0.12.0
+
+- **Nuevo formato propio `.mcdiep`** para el intercambio de Requerimientos
+  entre Agente del PAE y Abogado, en reemplazo del Excel (`.xlsx`) que se
+  usaba antes en ambos sentidos:
+  - Es un contenedor binario, no un Excel -- no se puede abrir ni editar a
+    mano con Excel ni con un editor de texto; cualquier alteración rompe
+    el archivo o invalida su firma.
+  - **La exportación del Agente para el Abogado (`LISTA DEL...`) ahora se
+    firma con el certificado del Agente** (se pide confirmar identidad con
+    el `.pfx` + contraseña al exportar) **y queda atada a un Abogado
+    específico** -- el destinatario elegido en el combo. Al importarla, el
+    Abogado ya no elige manualmente "de qué Agente es": el programa lo
+    determina de forma verificable a partir de la firma, muestra quién
+    firmó, y **si la firma no es válida o el archivo fue firmado para otro
+    Abogado, se niega a abrirlo**.
+  - La exportación del Abogado para el Agente (`requerimientos_capturado_
+    lote... ENTREGA...`) también pasa a `.mcdiep` -- no editable a mano --
+    aunque sin firma (el Abogado se autentica con contraseña, no tiene
+    certificado).
+  - La revisión del Agente (PROCEDE/NO PROCEDE) sigue siendo un Excel
+    normal: es un documento de trabajo interno, no el intercambio formal
+    entre las dos partes.
+
+## 0.11.0
+
+- **Corrección**: la revisión de actualizaciones ahora corre ANTES de
+  mostrar la pantalla de login (no después de iniciar sesión). Así, si hay
+  una versión nueva, se ofrece instalarla de una vez -- nadie llega a
+  autenticarse (ni, para el súper-usuario/Administrador, a generar un
+  certificado) contra una versión ya desactualizada.
+- **Nuevo: instalador `SistemaPAE_Setup.exe`** (con Inno Setup,
+  `packaging/installer.iss`) para quien instala por primera vez. En una
+  Windows recién instalada, descomprimir sólo el `.exe` podía dejar la
+  interfaz sin texto ni fondos por faltar el Redistribuible de Visual C++
+  de Microsoft -- el instalador lo revisa e instala automáticamente si
+  hace falta, y deja accesos directos en Menú Inicio/Escritorio. Se
+  instala en la carpeta del usuario, sin pedir permisos de administrador
+  (el programa necesita poder escribir su propia base de datos junto al
+  `.exe`). El `.zip` sigue disponible como alternativa portable.
+- **Nuevo: certificado "maestro" del súper-usuario.** Con
+  `packaging/generate_super_master_cert.py` (herramienta de quien publica
+  el programa, se corre una sola vez en su propia terminal) se puede
+  generar un certificado fijo que queda reconocido desde el primer
+  arranque en cualquier instalación nueva -- el súper-usuario ya no
+  necesita enrolar un certificado distinto en cada máquina; llega con el
+  mismo `.pfx` a cualquier lado. El Administrador no cambia: sigue
+  generando su propio certificado, distinto en cada máquina.
+
 ## 0.10.1
 
 - El Súper-usuario (y el propio Administrador) ahora ven también los datos

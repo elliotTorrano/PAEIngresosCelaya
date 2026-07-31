@@ -25,6 +25,13 @@ def main() -> int:
         QMessageBox.critical(None, "Error de instalación", str(exc))
         return 1
 
+    # Antes de pedir login: si hay una versión más nueva, se ofrece instalarla
+    # primero (si el usuario acepta, el proceso termina aquí y updater.exe
+    # reabre la versión nueva). Así nadie llega a autenticarse -- ni, para el
+    # súper-usuario/Administrador, a enrolar un certificado -- contra una
+    # versión ya desactualizada.
+    run_update_check(None)
+
     while True:
         login = LoginWindow()
         if login.exec() != QDialog.DialogCode.Accepted:
@@ -33,8 +40,6 @@ def main() -> int:
         user = session.current()
         if user is None:
             continue
-
-        run_update_check(None)  # tras login exitoso, para cualquier rol; nunca bloquea el flujo normal
 
         window = MainWindow(user)
         window.show()

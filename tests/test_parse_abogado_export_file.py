@@ -1,20 +1,21 @@
-import openpyxl
-
-from app.excel_io.requerimientos_export import HEADERS_ABOGADO
+from app.db.repositories.requerimientos import RequerimientoRow
+from app.excel_io.requerimientos_export import export_captured
 from app.excel_io.requerimientos_import import parse_abogado_export_file
 
 
+def _make_row(**overrides) -> RequerimientoRow:
+    base = dict(
+        id=1, batch_id=1, folio="F-001", cta_predial="CP-001", contribuyente="Juan Pérez", domicilio="Calle 1",
+        fecha_citatorio="01/01/2026", recibe_citatorio="EN PUERTA", recibe_citatorio_nombre=None,
+        fecha_notificacion="02/01/2026", quien_recibe="NOMBRE", quien_recibe_nombre="MARIA LOPEZ",
+    )
+    base.update(overrides)
+    return RequerimientoRow(**base)
+
+
 def test_parse_abogado_export_file_maps_all_columns(tmp_path):
-    path = tmp_path / "captura.xlsx"
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.append(HEADERS_ABOGADO)
-    ws.append([
-        "F-001", "CP-001", "Juan Pérez", "Calle 1",
-        "01/01/2026", "EN PUERTA", "",
-        "02/01/2026", "NOMBRE", "MARIA LOPEZ",
-    ])
-    wb.save(path)
+    path = tmp_path / "captura.mcdiep"
+    export_captured([_make_row()], path)
 
     rows = parse_abogado_export_file(path)
 
@@ -32,14 +33,10 @@ def test_parse_abogado_export_file_maps_all_columns(tmp_path):
     assert row["quien_recibe_nombre"] == "MARIA LOPEZ"
 
 
-def test_parse_abogado_export_file_skips_empty_rows(tmp_path):
-    path = tmp_path / "captura.xlsx"
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.append(HEADERS_ABOGADO)
-    ws.append(["F-001", "CP-001", "Juan Pérez", "Calle 1", "", "", "", "", "", ""])
-    ws.append([None] * 10)
-    wb.save(path)
+def test_parse_abogado_export_file_multiple_rows(tmp_path):
+    path = tmp_path / "captura.mcdiep"
+    export_captured([_make_row(id=1, folio="F-001"), _make_row(id=2, folio="F-002")], path)
 
     rows = parse_abogado_export_file(path)
-    assert len(rows) == 1
+    assert len(rows) == 2
+    assert rows[1]["folio"] == "F-002"

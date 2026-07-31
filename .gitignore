@@ -11,6 +11,10 @@ build/
 dist/
 *.spec.bak
 
+# Redistribuible de Microsoft que se empaqueta en el instalador (packaging/installer.iss):
+# ~25 MB, se descarga una vez por computadora de compilación, no se versiona.
+packaging/installer/vc_redist.x64.exe
+
 # Entornos virtuales, si se usan
 .venv/
 venv/

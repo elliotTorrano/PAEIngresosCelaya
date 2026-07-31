@@ -15,12 +15,22 @@ from pathlib import Path
 
 import openpyxl
 
+from app.auth.crypto_certs import verify_challenge
+from app.db.repositories import users as users_repo
+from app.db.repositories.users import User
+from app.excel_io import mcdiep_format
+
 COL_FOLIO = 2  # B
 COL_CTA_PREDIAL = 3  # C
 COL_CONTRIBUYENTE = 4  # D
 COL_DOMICILIO = 6  # F
 
 LEGACY_XLS_SUFFIXES = {".xls"}
+
+
+class McdiepVerificationError(Exception):
+    """El archivo .mcdiep no pasó la verificación de formato, firma o
+    destinatario -- por diseño, no se abre en ninguno de estos casos."""
 
 
 @dataclass
@@ -53,61 +63,57 @@ def parse_requerimientos_file(path: Path) -> ImportResult:
     return ImportResult(filename=path.name, rows=rows)
 
 
-def parse_agente_export_file(path: Path) -> list[dict]:
-    """Lee el archivo que el propio programa exportó para el Abogado (formato propio,
-    limpio: encabezados en la fila 1, datos desde la fila 2 — sin las filas irregulares
-    de los Excel originales). Siempre es .xlsx, porque lo genera el propio programa."""
-    workbook = openpyxl.load_workbook(path, data_only=True, read_only=True)
-    try:
-        sheet = workbook.active
-        rows = []
-        for cell_row in sheet.iter_rows(min_row=2):
-            row = [cell.value for cell in cell_row]
-            if _is_row_empty(row):
-                continue
-            rows.append(
-                {
-                    "folio": _value_text(row, 1),
-                    "cta_predial": _value_text(row, 2),
-                    "contribuyente": _value_text(row, 3),
-                    "domicilio": _value_text(row, 4),
-                }
-            )
-        return rows
-    finally:
-        workbook.close()
+def parse_agente_export_file(path: Path, *, abogado: User) -> tuple[list[dict], User]:
+    """Lee el archivo .mcdiep que el Agente del PAE exportó para `abogado`.
+
+    Verifica, en este orden: que sea un archivo .mcdiep del tipo correcto;
+    que el firmante exista localmente y tenga certificado registrado; que la
+    firma sea válida contra ESE certificado (cubre el contenido y el
+    destinatario); y que el destinatario firmado sea exactamente `abogado`.
+    Si cualquiera de estas verificaciones falla, no se abre -- se levanta
+    McdiepVerificationError con el motivo.
+
+    Devuelve (filas, agente_que_firmó) para que quien llama pueda mostrar
+    quién firmó el archivo."""
+    envelope = mcdiep_format.read_envelope(path)
+    if envelope.kind != mcdiep_format.KIND_AGENTE_TO_ABOGADO:
+        raise McdiepVerificationError(
+            "Este archivo no es una lista de Requerimientos exportada por un Agente del PAE."
+        )
+
+    signer = users_repo.get_by_username(envelope.signer_username or "")
+    if signer is None or not signer.cert_public_pem:
+        raise McdiepVerificationError(
+            f"El archivo dice estar firmado por '{envelope.signer_username}', pero esa cuenta "
+            "no existe o no tiene un certificado registrado en esta instalación."
+        )
+
+    signable = mcdiep_format.signable_bytes(envelope.kind, envelope.target_username, envelope.payload)
+    if not envelope.signature or not verify_challenge(signer.cert_public_pem, signable, envelope.signature):
+        raise McdiepVerificationError(
+            "La firma de este archivo no es válida: el contenido pudo haber sido alterado "
+            "después de firmarse, o el certificado del firmante ya no es el mismo."
+        )
+
+    if envelope.target_username != abogado.username:
+        raise McdiepVerificationError(
+            f"Este archivo fue firmado para el Abogado '{envelope.target_username}', no para "
+            f"'{abogado.username}'. No se abre."
+        )
+
+    return envelope.payload.get("rows", []), signer
 
 
 def parse_abogado_export_file(path: Path) -> list[dict]:
-    """Lee el archivo que el propio programa exportó con la captura del Abogado
-    (formato propio, mismo criterio que parse_agente_export_file: encabezados
-    en la fila 1, datos desde la fila 2, siempre .xlsx). Incluye las columnas
-    de citatorio y de notificación."""
-    workbook = openpyxl.load_workbook(path, data_only=True, read_only=True)
-    try:
-        sheet = workbook.active
-        rows = []
-        for cell_row in sheet.iter_rows(min_row=2):
-            row = [cell.value for cell in cell_row]
-            if _is_row_empty(row):
-                continue
-            rows.append(
-                {
-                    "folio": _value_text(row, 1),
-                    "cta_predial": _value_text(row, 2),
-                    "contribuyente": _value_text(row, 3),
-                    "domicilio": _value_text(row, 4),
-                    "fecha_citatorio": _value_text(row, 5),
-                    "recibe_citatorio": _value_text(row, 6),
-                    "recibe_citatorio_nombre": _value_text(row, 7),
-                    "fecha_notificacion": _value_text(row, 8),
-                    "quien_recibe": _value_text(row, 9),
-                    "quien_recibe_nombre": _value_text(row, 10),
-                }
-            )
-        return rows
-    finally:
-        workbook.close()
+    """Lee el archivo .mcdiep que el Abogado exportó con su captura, para el
+    Agente del PAE. No lleva firma (el Abogado no tiene certificado); sólo se
+    verifica que sea un .mcdiep del tipo correcto."""
+    envelope = mcdiep_format.read_envelope(path)
+    if envelope.kind != mcdiep_format.KIND_ABOGADO_TO_AGENTE:
+        raise McdiepVerificationError(
+            "Este archivo no es una captura de Abogado exportada por Sistema PAE."
+        )
+    return envelope.payload.get("rows", [])
 
 
 def _read_all_row_values(path: Path) -> list[list]:

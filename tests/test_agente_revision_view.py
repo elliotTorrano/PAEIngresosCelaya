@@ -1,11 +1,10 @@
 from unittest.mock import patch
 
-import openpyxl
-
 from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
 from app.db.repositories import revisiones as revisiones_repo
 from app.db.repositories import users as users_repo
-from app.excel_io.requerimientos_export import HEADERS_ABOGADO
+from app.db.repositories.requerimientos import RequerimientoRow
+from app.excel_io.requerimientos_export import HEADERS_ABOGADO, export_captured
 from app.ui.agente.requerimientos_import_view import RequerimientosImportView
 
 
@@ -22,16 +21,17 @@ def _make_agente_abogado():
 
 
 def _write_captura_file(path):
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.append(HEADERS_ABOGADO)
-    ws.append(["F-001", "CP-001", "Juan Pérez", "Calle 1", "01/01/2026", "EN PUERTA", "", "02/01/2026", "EN PUERTA", ""])
-    wb.save(path)
+    row = RequerimientoRow(
+        id=1, batch_id=1, folio="F-001", cta_predial="CP-001", contribuyente="Juan Pérez", domicilio="Calle 1",
+        fecha_citatorio="01/01/2026", recibe_citatorio="EN PUERTA", recibe_citatorio_nombre=None,
+        fecha_notificacion="02/01/2026", quien_recibe="EN PUERTA", quien_recibe_nombre=None,
+    )
+    export_captured([row], path)
 
 
 def test_import_revision_persists_rows_and_refreshes_table(qapp, db, tmp_path):
     agente = _make_agente_abogado()
-    path = tmp_path / "captura.xlsx"
+    path = tmp_path / "captura.mcdiep"
     _write_captura_file(path)
 
     view = RequerimientosImportView(agente)
@@ -91,7 +91,7 @@ def test_export_revision_writes_file(qapp, db, tmp_path):
 
 def test_simulate_mode_blocks_import_procede_and_export(qapp, db, tmp_path):
     agente = _make_agente_abogado()
-    path = tmp_path / "captura.xlsx"
+    path = tmp_path / "captura.mcdiep"
     _write_captura_file(path)
 
     view = RequerimientosImportView(agente, simulate=True)

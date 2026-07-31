@@ -3,6 +3,11 @@ capturados por consola. No se empaqueta en el .exe -- se corre una sola vez (o
 cuando cambien los datos por defecto del súper-usuario/Administrador) antes de
 compilar la versión que se va a distribuir.
 
+Si además quieres que el súper-usuario tenga el MISMO certificado reconocido
+en cualquier máquina nueva (en vez de generar uno distinto la primera vez que
+inicia sesión en cada una), corre después packaging/generate_super_master_cert.py
+-- agrega el certificado a este mismo archivo sin pedirte los datos de nuevo.
+
 Uso:
     python packaging/generate_seed.py
 """

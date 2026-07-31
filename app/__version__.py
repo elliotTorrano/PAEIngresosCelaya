@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.10.1"
+__version__ = "0.12.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -92,4 +92,16 @@ VERSION_NOTES = {
               "Administrador en la pantalla 'Usuarios', junto a Agentes del PAE y "
               "Abogados. Sigue siendo sólo de consulta: es una cuenta única, no se da de "
               "alta ni se edita desde ahí.",
+    "0.11.0": "La revisión de actualizaciones ahora corre antes del login, no después. "
+              "Nuevo instalador SistemaPAE_Setup.exe para primeras instalaciones (instala "
+              "el Redistribuible de Visual C++ si falta, evitando la interfaz sin texto/"
+              "fondos; deja accesos directos). Nuevo: certificado \"maestro\" del "
+              "súper-usuario, reconocido desde el primer arranque en cualquier máquina "
+              "nueva, sin enrolar uno distinto en cada una.",
+    "0.12.0": "Nuevo formato propio .mcdiep para el intercambio de Requerimientos entre "
+              "Agente del PAE y Abogado, en vez de Excel: no se puede editar a mano. La "
+              "exportación del Agente para el Abogado queda firmada con su certificado y "
+              "atada a un Abogado específico -- al importarla se muestra quién firmó, y si "
+              "la firma no es válida o es para otro Abogado, no se abre. La exportación del "
+              "Abogado para el Agente también pasa a .mcdiep, sin firma.",
 }

@@ -17,26 +17,33 @@ from PySide6.QtWidgets import (
 )
 
 from app.auth.cert_auth import verify_certificate_file
+from app.auth.crypto_certs import load_bundle
 from app.db.repositories.users import User
 
 
 class CertificateConfirmDialog(QDialog):
     """Pide el certificado .pfx + contraseña ACTUALES de `user` y los verifica
     contra lo registrado en la base. Si exec() devuelve Accepted, la
-    verificación fue exitosa."""
+    verificación fue exitosa y `self.private_key` queda disponible -- por
+    ejemplo, para firmar algo con esa misma llave sin pedir la contraseña
+    una segunda vez."""
 
-    def __init__(self, user: User, parent=None):
+    def __init__(self, user: User, parent=None, message: str | None = None):
         super().__init__(parent)
         self.user = user
         self._cert_path: str | None = None
+        self.private_key = None
         self.setWindowTitle(f"Confirmar identidad — {user.full_name}")
         self.setMinimumWidth(420)
 
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
-                f"Para cambiar estos datos, confirme la identidad de '{user.full_name}' con "
-                "su certificado ACTUAL (el que va a reemplazarse por uno nuevo)."
+                message
+                or (
+                    f"Para cambiar estos datos, confirme la identidad de '{user.full_name}' con "
+                    "su certificado ACTUAL (el que va a reemplazarse por uno nuevo)."
+                )
             )
         )
 
@@ -73,9 +80,12 @@ class CertificateConfirmDialog(QDialog):
             QMessageBox.warning(self, "Falta el certificado", "Seleccione el archivo .pfx actual.")
             return
 
-        ok, message = verify_certificate_file(self.user, Path(self._cert_path), self.password_input.text())
+        pfx_path = Path(self._cert_path)
+        password = self.password_input.text()
+        ok, message = verify_certificate_file(self.user, pfx_path, password)
         if not ok:
             QMessageBox.warning(self, "No se pudo confirmar", message)
             return
 
+        self.private_key, _certificate = load_bundle(pfx_path.read_bytes(), password)
         self.accept()

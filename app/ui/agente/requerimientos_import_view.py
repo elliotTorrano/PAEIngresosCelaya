@@ -9,6 +9,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
+    QDialog,
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
@@ -26,9 +27,15 @@ from app.config import ROLE_ABOGADO
 from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import revisiones as revisiones_repo
 from app.db.repositories import users as users_repo
+from app.excel_io import mcdiep_format
 from app.excel_io.duplicates import find_duplicate_filenames
 from app.excel_io.requerimientos_export import HEADERS_REVISION, export_for_abogado, export_revision
-from app.excel_io.requerimientos_import import parse_abogado_export_file, parse_requerimientos_file
+from app.excel_io.requerimientos_import import (
+    McdiepVerificationError,
+    parse_abogado_export_file,
+    parse_requerimientos_file,
+)
+from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
 from app.utils.paths import exports_dir
 
 PROCEDE_OPTIONS = ("", "PROCEDE", "NO PROCEDE")
@@ -211,6 +218,23 @@ class RequerimientosImportView(QWidget):
                 "No se guardó ni exportó nada de verdad.",
             )
         else:
+            if not users_repo.has_certificate(self.agente_user):
+                QMessageBox.warning(
+                    self, "Sin certificado registrado",
+                    "Debe tener un certificado generado para poder firmar el archivo que se exporta.",
+                )
+                return
+
+            confirm_dialog = CertificateConfirmDialog(
+                self.agente_user, parent=self,
+                message=(
+                    "El archivo que se va a exportar para el Abogado queda firmado con su "
+                    "certificado. Confirme su identidad con su certificado actual."
+                ),
+            )
+            if confirm_dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+
             batch_id = req_repo.create_batch(abogado_id=abogado_id, agente_id=self.agente_user.id)
             req_repo.add_rows(batch_id, self._rows)
             req_repo.link_imported_files_to_batch(
@@ -218,12 +242,19 @@ class RequerimientosImportView(QWidget):
             )
 
             fecha = datetime.now().strftime("%d_%m_%Y")
-            output_path = exports_dir() / f"LISTA DEL {fecha} {_sanitize_filename(abogado.full_name)}.xlsx"
-            export_for_abogado(self._rows, output_path)
+            output_path = (
+                exports_dir()
+                / f"LISTA DEL {fecha} {_sanitize_filename(abogado.full_name)}{mcdiep_format.EXTENSION}"
+            )
+            export_for_abogado(
+                self._rows, output_path,
+                agente=self.agente_user, abogado=abogado, private_key=confirm_dialog.private_key,
+            )
             req_repo.set_batch_export_path(batch_id, agente_path=str(output_path))
 
             QMessageBox.information(
-                self, "Exportado", f"Se exportaron {len(self._rows)} filas para {abogado.full_name}:\n{output_path}"
+                self, "Exportado",
+                f"Se exportaron y firmaron {len(self._rows)} filas para {abogado.full_name}:\n{output_path}",
             )
 
         self._rows = []
@@ -241,13 +272,16 @@ class RequerimientosImportView(QWidget):
             return
 
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Seleccionar captura del Abogado", "", "Excel (*.xlsx)"
+            self, "Seleccionar captura del Abogado", "", "Sistema PAE (*.mcdiep)"
         )
         if not file_path:
             return
 
         try:
             rows = parse_abogado_export_file(Path(file_path))
+        except McdiepVerificationError as exc:
+            QMessageBox.critical(self, "No se pudo abrir el archivo", str(exc))
+            return
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Error al leer el archivo", str(exc))
             return

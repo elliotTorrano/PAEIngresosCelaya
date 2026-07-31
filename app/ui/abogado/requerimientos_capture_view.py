@@ -33,11 +33,12 @@ from PySide6.QtWidgets import (
 )
 
 from app.auth.recovery import open_email_client
-from app.config import BATCH_STATUS_EXPORTADO, QUIEN_RECIBE_EN_PUERTA, QUIEN_RECIBE_NOMBRE, ROLE_AGENTE_PAE
+from app.config import BATCH_STATUS_EXPORTADO, QUIEN_RECIBE_EN_PUERTA, QUIEN_RECIBE_NOMBRE
 from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import users as users_repo
+from app.excel_io import mcdiep_format
 from app.excel_io.requerimientos_export import export_captured
-from app.excel_io.requerimientos_import import parse_agente_export_file
+from app.excel_io.requerimientos_import import McdiepVerificationError, parse_agente_export_file
 from app.utils.paths import exports_dir
 
 (
@@ -129,27 +130,20 @@ class RequerimientosCaptureView(QWidget):
             )
             return
 
-        agentes = users_repo.list_by_role(ROLE_AGENTE_PAE)
-        if not agentes:
-            QMessageBox.warning(self, "Sin agentes", "No hay Agentes del PAE registrados en esta instalación.")
-            return
-
-        file_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar archivo del Agente del PAE", "", "Excel (*.xlsx)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Seleccionar archivo del Agente del PAE", "", "Sistema PAE (*.mcdiep)"
+        )
         if not file_path:
             return
 
-        agente = agentes[0]
-        if len(agentes) > 1:
-            from PySide6.QtWidgets import QInputDialog
-
-            labels = [f"{a.full_name} ({a.username})" for a in agentes]
-            label, ok = QInputDialog.getItem(self, "Agente", "¿De qué Agente del PAE es este archivo?", labels, editable=False)
-            if not ok:
-                return
-            agente = agentes[labels.index(label)]
-
+        # No se pregunta "de qué Agente es" -- el propio archivo lo dice, de
+        # forma verificable: sólo se abre si la firma es válida y el archivo
+        # fue firmado específicamente para esta cuenta de Abogado.
         try:
-            rows = parse_agente_export_file(Path(file_path))
+            rows, agente = parse_agente_export_file(Path(file_path), abogado=self.abogado_user)
+        except McdiepVerificationError as exc:
+            QMessageBox.critical(self, "No se pudo abrir el archivo", str(exc))
+            return
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Error al leer el archivo", str(exc))
             return
@@ -166,7 +160,11 @@ class RequerimientosCaptureView(QWidget):
         )
         self._refresh_batch_list()
         self._load_batch(batch_id)
-        QMessageBox.information(self, "Importado", f"Se importaron {len(rows)} filas al lote #{batch_id}.")
+        QMessageBox.information(
+            self, "Importado",
+            f"Se importaron {len(rows)} filas al lote #{batch_id}.\n\n"
+            f"Firmado por: {agente.full_name} ({agente.username}).",
+        )
 
     # --- Tabla de captura ------------------------------------------------------------
     def _refresh_table(self) -> None:
@@ -352,7 +350,10 @@ class RequerimientosCaptureView(QWidget):
             return
 
         fecha = datetime.now().strftime("%d_%m_%Y")
-        output_path = exports_dir() / f"requerimientos_capturado_lote{self._current_batch_id} ENTREGA {fecha}.xlsx"
+        output_path = (
+            exports_dir()
+            / f"requerimientos_capturado_lote{self._current_batch_id} ENTREGA {fecha}{mcdiep_format.EXTENSION}"
+        )
         export_captured(self._rows, output_path)
         req_repo.set_batch_export_path(self._current_batch_id, abogado_path=str(output_path))
         req_repo.set_batch_status(self._current_batch_id, BATCH_STATUS_EXPORTADO)
