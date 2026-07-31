@@ -1,5 +1,38 @@
 # Historial de versiones — Sistema PAE
 
+## 0.19.0
+
+- **Corregido: "Revisar Formato Requerimiento" concatenaba archivos**. Al
+  importar varias capturas del Abogado una tras otra, la tabla mostraba
+  TODAS las filas de TODOS los archivos importados alguna vez, mezcladas
+  entre sí, en vez de sólo las del archivo recién cargado. Ahora cada
+  archivo importado es su propio evento (`revision_imports`), y la tabla
+  sólo muestra el que está abierto.
+- **Nueva pantalla previa Pendiente/Revisado**: al abrir "Revisar Formato
+  Requerimiento" se elige primero si se quieren ver los archivos
+  pendientes de marcar PROCEDE/NO PROCEDE en todas sus filas, o los que
+  ya se terminaron de revisar; la lista muestra cuántas filas de cada uno
+  ya se revisaron. Esto sirve para verificar de un vistazo qué entregas
+  del Abogado siguen pendientes. Un botón "Abrir" carga el archivo
+  elegido en la tabla y otro "Limpiar" vacía la lista y cierra lo
+  abierto. La exportación consolidada ("Exportar revisión") no cambió:
+  sigue incluyendo todo lo importado, revisado o no.
+- Las bases de datos existentes migran automáticamente: las filas de
+  revisión ya guardadas se agrupan por archivo/fecha de importación para
+  reconstruir sus `revision_imports` sin perder ningún dato ni el
+  PROCEDE/NO PROCEDE ya marcado.
+
+## 0.18.1
+
+- **Menú Formato del Agente del PAE reorganizado en submenús**: en vez de
+  dos acciones sueltas, ahora es "Generar Formato" y "Revisar Formato",
+  cada uno desplegando "Requerimiento" y "Mandamiento (Próximamente)".
+  El Mandamiento todavía no está desarrollado, pero el menú y su pestaña
+  ya quedan preparados para cuando se implemente. Las pestañas se
+  renombraron a "Generar Formato Requerimiento", "Generar Formato
+  Mandamiento", "Revisar Formato Requerimiento" y "Revisar Formato
+  Mandamiento" para que coincidan con la ruta del menú que las abrió.
+
 ## 0.18.0
 
 - **Menú Formato del Agente del PAE dividido en dos pantallas**: "Generar

@@ -51,7 +51,7 @@ def test_agente_formato_menu_adds_and_reuses_generar_tab(qapp, db):
     window = MainWindow(_make_agente())
 
     window._show_generar_formato_tab()
-    assert _tab_titles(window) == ["Bienvenida", "Generar formato"]
+    assert _tab_titles(window) == ["Bienvenida", "Generar Formato Requerimiento"]
     assert window.tabs.currentWidget() is window._formato_widgets["generar_formato"]
 
     window.tabs.setCurrentIndex(0)
@@ -63,7 +63,7 @@ def test_agente_formato_menu_adds_and_reuses_revisar_tab(qapp, db):
     window = MainWindow(_make_agente())
 
     window._show_revisar_formato_tab()
-    assert _tab_titles(window) == ["Bienvenida", "Revisar formato de abogado"]
+    assert _tab_titles(window) == ["Bienvenida", "Revisar Formato Requerimiento"]
     assert window.tabs.currentWidget() is window._formato_widgets["revisar_formato"]
 
     window.tabs.setCurrentIndex(0)
@@ -77,11 +77,27 @@ def test_agente_generar_y_revisar_son_pestanas_independientes(qapp, db):
     window._show_generar_formato_tab()
     window._show_revisar_formato_tab()
 
-    assert _tab_titles(window) == ["Bienvenida", "Generar formato", "Revisar formato de abogado"]
+    assert _tab_titles(window) == [
+        "Bienvenida", "Generar Formato Requerimiento", "Revisar Formato Requerimiento",
+    ]
 
 
-def test_agente_formato_menu_mandamientos_placeholder(qapp, db):
+def test_agente_formato_menu_mandamiento_placeholders(qapp, db):
     window = MainWindow(_make_agente())
+
+    window._show_generar_mandamiento_tab()
+    assert "Generar Formato Mandamiento" in _tab_titles(window)
+    window._show_generar_mandamiento_tab()
+    assert _tab_titles(window).count("Generar Formato Mandamiento") == 1
+
+    window._show_revisar_mandamiento_tab()
+    assert "Revisar Formato Mandamiento" in _tab_titles(window)
+    window._show_revisar_mandamiento_tab()
+    assert _tab_titles(window).count("Revisar Formato Mandamiento") == 1
+
+
+def test_abogado_formato_menu_mandamientos_placeholder(qapp, db):
+    window = MainWindow(_make_abogado())
 
     window._show_mandamientos_tab()
     assert "Mandamientos (próximamente)" in _tab_titles(window)
@@ -121,8 +137,8 @@ def test_admin_keeps_direct_requerimientos_tab_plus_welcome(qapp, db):
     titles = _tab_titles(window)
     assert titles == [
         "Bienvenida",
-        "Generar formato (Agente del PAE)",
-        "Revisar formato de abogado (Agente del PAE)",
+        "Generar Formato Requerimiento (Agente del PAE)",
+        "Revisar Formato Requerimiento (Agente del PAE)",
         "Usuarios",
         "Solicitudes de reset",
         "Apariencia",
@@ -149,7 +165,7 @@ def test_dynamic_tab_can_be_closed_and_reopened(qapp, db):
     assert _tab_titles(window) == ["Bienvenida"]
 
     window._show_generar_formato_tab()
-    assert "Generar formato" in _tab_titles(window)
+    assert "Generar Formato Requerimiento" in _tab_titles(window)
 
 
 def test_super_gets_ver_como_menu_and_can_open_agente_simulation(qapp, db):
@@ -159,11 +175,11 @@ def test_super_gets_ver_como_menu_and_can_open_agente_simulation(qapp, db):
     from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
 
     widget = RequerimientosGenerarView(agente, simulate=True)
-    window.tabs.addTab(widget, f"Viendo como: {agente.full_name} — Generar formato")
+    window.tabs.addTab(widget, f"Viendo como: {agente.full_name} — Generar Formato Requerimiento")
     window._viendo_como_widgets[f"generar:{agente.id}"] = widget
 
     assert widget.simulate is True
-    assert f"Viendo como: {agente.full_name} — Generar formato" in _tab_titles(window)
+    assert f"Viendo como: {agente.full_name} — Generar Formato Requerimiento" in _tab_titles(window)
 
 
 def test_super_can_open_agente_simulation_via_choose_dialog(qapp, db):
@@ -181,7 +197,7 @@ def test_super_can_open_agente_simulation_via_choose_dialog(qapp, db):
         window._on_choose_view_as()
 
     titles = _tab_titles(window)
-    assert f"Viendo como: {agente.full_name} — Generar formato" in titles
-    assert f"Viendo como: {agente.full_name} — Revisar formato de abogado" in titles
+    assert f"Viendo como: {agente.full_name} — Generar Formato Requerimiento" in titles
+    assert f"Viendo como: {agente.full_name} — Revisar Formato Requerimiento" in titles
     assert f"generar:{agente.id}" in window._viendo_como_widgets
     assert f"revisar:{agente.id}" in window._viendo_como_widgets

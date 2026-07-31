@@ -64,9 +64,19 @@ CREATE TABLE IF NOT EXISTS requerimiento_rows (
     captured_at              TEXT
 );
 
+CREATE TABLE IF NOT EXISTS revision_imports (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    agente_id        INTEGER NOT NULL REFERENCES users(id),
+    source_filename  TEXT NOT NULL,
+    abogado_nombre   TEXT,
+    abogado_id       INTEGER REFERENCES users(id),
+    imported_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS revision_rows (
     id                       INTEGER PRIMARY KEY AUTOINCREMENT,
     agente_id                INTEGER NOT NULL REFERENCES users(id),
+    revision_import_id       INTEGER REFERENCES revision_imports(id),
     source_filename          TEXT NOT NULL,
     abogado_nombre           TEXT,
     abogado_id               INTEGER REFERENCES users(id),
@@ -104,3 +114,4 @@ CREATE INDEX IF NOT EXISTS idx_imported_files_agente ON imported_files(agente_id
 CREATE INDEX IF NOT EXISTS idx_batches_abogado ON requerimiento_batches(abogado_id);
 CREATE INDEX IF NOT EXISTS idx_rows_batch ON requerimiento_rows(batch_id);
 CREATE INDEX IF NOT EXISTS idx_revision_rows_agente ON revision_rows(agente_id);
+CREATE INDEX IF NOT EXISTS idx_revision_imports_agente ON revision_imports(agente_id);

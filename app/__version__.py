@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.18.0"
+__version__ = "0.19.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -165,4 +165,16 @@ VERSION_NOTES = {
               "que lista los lotes de ese tipo; un botón 'Abrir' carga el seleccionado en "
               "la tabla y otro 'Limpiar' vacía la lista y cierra lo abierto. Cambiar el "
               "tipo directamente también vacía la lista mostrada.",
+    "0.18.1": "El menú Formato del Agente del PAE se reorganizó en submenús: 'Generar "
+              "Formato' y 'Revisar Formato', cada uno con 'Requerimiento' y 'Mandamiento "
+              "(Próximamente)' -- este último ya preparado en el menú aunque todavía no "
+              "esté desarrollado. Las pestañas correspondientes ahora se llaman 'Generar "
+              "Formato Requerimiento', 'Generar Formato Mandamiento', 'Revisar Formato "
+              "Requerimiento' y 'Revisar Formato Mandamiento'.",
+    "0.19.0": "Corregido: en 'Revisar Formato Requerimiento', importar varios archivos "
+              "de captura del Abogado los iba concatenando en una sola tabla -- ahora cada "
+              "archivo importado queda separado, y la tabla sólo muestra el que se abrió. "
+              "Nueva pantalla previa con un combo Pendiente/Revisado: lista los archivos "
+              "importados según si ya se marcó PROCEDE/NO PROCEDE en todas sus filas o no, "
+              "para saber de un vistazo qué entregas del Abogado faltan por revisar.",
 }

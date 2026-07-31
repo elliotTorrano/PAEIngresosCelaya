@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -27,6 +29,7 @@ from app.db.repositories import revisiones as revisiones_repo
 from app.db.repositories import users as users_repo
 from app.excel_io.requerimientos_export import HEADERS_REVISION, export_revision
 from app.excel_io.requerimientos_import import McdiepVerificationError, parse_abogado_export_file
+from app.utils.dates import format_local_datetime
 from app.utils.paths import exports_dir
 
 PROCEDE_OPTIONS = ("", "PROCEDE", "NO PROCEDE")
@@ -36,24 +39,32 @@ REVISION_SEARCH_COLUMNS = {"FOLIO": 0, "CTA PREDIAL": 1, "CONTRIBUYENTE": 2}
 
 SIN_ARCHIVO_TEXT = "Archivo en revisión: (ninguno)"
 
+DOC_STATE_PENDIENTE = "PENDIENTE"
+DOC_STATE_REVISADO = "REVISADO"
+DOC_STATES = (
+    ("Pendiente", DOC_STATE_PENDIENTE),
+    ("Revisado", DOC_STATE_REVISADO),
+)
+
 
 class RequerimientosRevisionView(QWidget):
-    # Emite el nombre del archivo recién importado (o "" tras limpiar), para
-    # que la ventana que aloja esta vista (una pestaña) pueda reflejarlo en
-    # su título -- ver MainWindow._show_revisar_formato_tab.
+    # Emite el nombre del archivo actualmente abierto (o "" tras limpiar/sin
+    # selección), para que la ventana que aloja esta vista (una pestaña)
+    # pueda reflejarlo en su título -- ver MainWindow._show_revisar_formato_tab.
     archivo_cambiado = Signal(str)
 
     def __init__(self, agente_user: users_repo.User, parent=None, simulate: bool = False):
         super().__init__(parent)
         self.agente_user = agente_user
         self.simulate = simulate
+        self._current_import_id: int | None = None
 
         layout = QVBoxLayout(self)
 
         if self.simulate:
             banner = QLabel(
-                "Modo simulación: puede probar el flujo completo, pero nada de lo que haga "
-                "aquí se guarda."
+                "Modo simulación: puede navegar archivos ya importados y probar el flujo, "
+                "pero nada de lo que haga aquí se guarda; no se pueden importar archivos nuevos."
             )
             banner.setStyleSheet(
                 "background-color: rgba(255, 224, 138, 0.9); padding: 6px; border-radius: 4px;"
@@ -62,7 +73,8 @@ class RequerimientosRevisionView(QWidget):
 
         layout.addWidget(QLabel(
             "Importe el Excel que el Abogado capturó y exportó, para marcar PROCEDE "
-            "o NO PROCEDE en cada fila."
+            "o NO PROCEDE en cada fila. Cada archivo importado queda separado -- "
+            "elija abajo si quiere ver los pendientes de revisar o los ya revisados."
         ))
 
         abogado_row = QHBoxLayout()
@@ -76,6 +88,32 @@ class RequerimientosRevisionView(QWidget):
         import_revision_btn = QPushButton("Importar captura del Abogado")
         import_revision_btn.clicked.connect(self._on_import_revision)
         layout.addWidget(import_revision_btn)
+
+        # Pantalla previa: se elige el ESTADO de revisión (Pendiente/Revisado)
+        # y sólo entonces se listan los archivos importados en ese estado.
+        # "Abrir" carga el seleccionado en la tabla de abajo -- ésa es la
+        # única forma en que el contenido de la tabla cambia, así que nunca
+        # se "concatenan" filas de dos archivos distintos. "Limpiar" vacía la
+        # lista y cierra lo que estuviera abierto. Cambiar el estado
+        # directamente también vacía la lista mostrada.
+        selector_row = QHBoxLayout()
+        selector_row.addWidget(QLabel("Estado de revisión:"))
+        self.estado_combo = QComboBox()
+        for label, value in DOC_STATES:
+            self.estado_combo.addItem(label, value)
+        self.estado_combo.currentIndexChanged.connect(self._on_estado_changed)
+        selector_row.addWidget(self.estado_combo)
+        open_import_btn = QPushButton("Abrir")
+        open_import_btn.clicked.connect(self._on_open_selected_import)
+        selector_row.addWidget(open_import_btn)
+        clear_btn = QPushButton("Limpiar")
+        clear_btn.clicked.connect(self._on_clear)
+        selector_row.addWidget(clear_btn)
+        layout.addLayout(selector_row)
+
+        self.available_list = QListWidget()
+        self.available_list.setMaximumHeight(140)
+        layout.addWidget(self.available_list)
 
         self.filename_label = QLabel(SIN_ARCHIVO_TEXT)
         self.filename_label.setWordWrap(True)
@@ -103,12 +141,57 @@ class RequerimientosRevisionView(QWidget):
         self.revision_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.revision_table)
 
-        export_revision_btn = QPushButton("Exportar revisión")
+        export_revision_btn = QPushButton("Exportar revisión (todo lo importado)")
         export_revision_btn.clicked.connect(self._on_export_revision)
         layout.addWidget(export_revision_btn)
 
-        self._refresh_revision_table()
+        self._refresh_available_list()
 
+    # --- Archivos importados (pantalla previa) --------------------------------------
+    def _refresh_available_list(self) -> None:
+        self.available_list.clear()
+        want_reviewed = self.estado_combo.currentData() == DOC_STATE_REVISADO
+        for imp in revisiones_repo.list_revision_imports(self.agente_user.id):
+            if imp.is_reviewed != want_reviewed:
+                continue
+            label = (
+                f"{imp.source_filename} — {imp.reviewed_rows}/{imp.total_rows} revisadas — "
+                f"{format_local_datetime(imp.imported_at)}"
+            )
+            item = QListWidgetItem(label)
+            item.setData(1000, imp.id)
+            self.available_list.addItem(item)
+
+    def _on_estado_changed(self) -> None:
+        # "Si se cambia directamente el estado, borre los archivos
+        # disponibles": no se conserva la lista del estado anterior.
+        self._refresh_available_list()
+
+    def _on_open_selected_import(self) -> None:
+        item = self.available_list.currentItem()
+        if item is None:
+            QMessageBox.information(
+                self, "Nada seleccionado", "Seleccione un archivo de la lista primero."
+            )
+            return
+        self._load_import(item.data(1000))
+
+    def _load_import(self, revision_import_id: int) -> None:
+        self._current_import_id = revision_import_id
+        rows = revisiones_repo.list_revision_rows_for_import(revision_import_id)
+        filename = rows[0].source_filename if rows else None
+        self.filename_label.setText(f"Archivo en revisión: {filename}" if filename else SIN_ARCHIVO_TEXT)
+        self.archivo_cambiado.emit(filename or "")
+        self._refresh_revision_table(rows)
+
+    def _on_clear(self) -> None:
+        self.available_list.clear()
+        self._current_import_id = None
+        self.filename_label.setText(SIN_ARCHIVO_TEXT)
+        self.archivo_cambiado.emit("")
+        self._refresh_revision_table([])
+
+    # --- Importar ------------------------------------------------------------------
     def _on_import_revision(self) -> None:
         if self.simulate:
             QMessageBox.information(
@@ -139,21 +222,30 @@ class RequerimientosRevisionView(QWidget):
         abogado_id = self.abogado_combo.currentData()
         abogado = users_repo.get_by_id(abogado_id) if abogado_id else None
         filename = Path(file_path).name
+        abogado_nombre = abogado.full_name if abogado else None
 
+        revision_import_id = revisiones_repo.create_revision_import(
+            agente_id=self.agente_user.id, source_filename=filename,
+            abogado_nombre=abogado_nombre, abogado_id=abogado_id,
+        )
         revisiones_repo.add_revision_rows(
-            agente_id=self.agente_user.id,
-            source_filename=filename,
-            abogado_nombre=abogado.full_name if abogado else None,
-            abogado_id=abogado_id,
+            agente_id=self.agente_user.id, revision_import_id=revision_import_id,
+            source_filename=filename, abogado_nombre=abogado_nombre, abogado_id=abogado_id,
             rows=rows,
         )
-        self._refresh_revision_table()
-        self.filename_label.setText(f"Archivo en revisión: {filename}")
-        self.archivo_cambiado.emit(filename)
+
+        self.estado_combo.setCurrentIndex(self.estado_combo.findData(DOC_STATE_PENDIENTE))
+        self._refresh_available_list()
+        self._load_import(revision_import_id)
+        for row in range(self.available_list.count()):
+            if self.available_list.item(row).data(1000) == revision_import_id:
+                self.available_list.setCurrentRow(row)
+                break
+
         QMessageBox.information(self, "Importado", f"Se importaron {len(rows)} filas para revisión.")
 
-    def _refresh_revision_table(self) -> None:
-        rows = revisiones_repo.list_revision_rows(self.agente_user.id)
+    # --- Tabla de revisión -----------------------------------------------------------
+    def _refresh_revision_table(self, rows: list[revisiones_repo.RevisionRow]) -> None:
         self.revision_table.setUpdatesEnabled(False)
         try:
             self.revision_table.setRowCount(len(rows))
@@ -219,6 +311,7 @@ class RequerimientosRevisionView(QWidget):
         if self.simulate:
             return
         revisiones_repo.update_revision_procede(row_id, combo.currentData())
+        self._refresh_available_list()
 
     def _on_export_revision(self) -> None:
         rows = revisiones_repo.list_revision_rows(self.agente_user.id)

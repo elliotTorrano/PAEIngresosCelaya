@@ -21,6 +21,11 @@ from app.ui.widgets.background_widget import BackgroundWidget
 from app.ui.widgets.styles import apply_window_background
 from app.ui.widgets.welcome_view import WelcomeView
 
+TAB_GENERAR_REQUERIMIENTO = "Generar Formato Requerimiento"
+TAB_GENERAR_MANDAMIENTO = "Generar Formato Mandamiento"
+TAB_REVISAR_REQUERIMIENTO = "Revisar Formato Requerimiento"
+TAB_REVISAR_MANDAMIENTO = "Revisar Formato Mandamiento"
+
 
 class MainWindow(QMainWindow):
     def __init__(self, user: User):
@@ -69,13 +74,13 @@ class MainWindow(QMainWindow):
             from app.ui.agente.requerimientos_revision_view import RequerimientosRevisionView
 
             self._add_permanent_tab(
-                RequerimientosGenerarView(self.user), "Generar formato (Agente del PAE)"
+                RequerimientosGenerarView(self.user), f"{TAB_GENERAR_REQUERIMIENTO} (Agente del PAE)"
             )
             revision_widget = RequerimientosRevisionView(self.user)
             revision_widget.archivo_cambiado.connect(
                 lambda filename: self._on_revision_filename_changed(revision_widget, filename)
             )
-            self._add_permanent_tab(revision_widget, "Revisar formato de abogado (Agente del PAE)")
+            self._add_permanent_tab(revision_widget, f"{TAB_REVISAR_REQUERIMIENTO} (Agente del PAE)")
 
         if role in (ROLE_ADMINISTRADOR, ROLE_SUPERUSUARIO):
             from app.ui.admin.account_settings_view import AccountSettingsView
@@ -114,19 +119,29 @@ class MainWindow(QMainWindow):
         if self.user.role == ROLE_AGENTE_PAE:
             # Dos pantallas separadas (no una sola con todo apilado) para que
             # generar el formato para el Abogado y revisar lo que el Abogado
-            # devolvió no se interrumpan visualmente entre sí.
-            generar_action = menu.addAction("Generar formato")
-            generar_action.triggered.connect(self._show_generar_formato_tab)
-            revisar_action = menu.addAction("Revisar formato de abogado")
-            revisar_action.triggered.connect(self._show_revisar_formato_tab)
+            # devolvió no se interrumpan visualmente entre sí. Cada una, a su
+            # vez, se agrupa por tipo de documento (Requerimiento/Mandamiento)
+            # -- Mandamiento todavía no está desarrollado, pero el menú y la
+            # pestaña ya quedan preparados para cuando se implemente.
+            generar_menu = menu.addMenu("Generar Formato")
+            generar_req_action = generar_menu.addAction("Requerimiento")
+            generar_req_action.triggered.connect(self._show_generar_formato_tab)
+            generar_mand_action = generar_menu.addAction("Mandamiento (Próximamente)")
+            generar_mand_action.triggered.connect(self._show_generar_mandamiento_tab)
+
+            revisar_menu = menu.addMenu("Revisar Formato")
+            revisar_req_action = revisar_menu.addAction("Requerimiento")
+            revisar_req_action.triggered.connect(self._show_revisar_formato_tab)
+            revisar_mand_action = revisar_menu.addAction("Mandamiento (Próximamente)")
+            revisar_mand_action.triggered.connect(self._show_revisar_mandamiento_tab)
         else:
             req_action = menu.addAction("Formato de Requerimientos")
             req_action.triggered.connect(self._show_requerimientos_tab)
-        mandamientos_action = menu.addAction("Mandamientos (próximamente)")
-        mandamientos_action.triggered.connect(self._show_mandamientos_tab)
+            mandamientos_action = menu.addAction("Mandamientos (próximamente)")
+            mandamientos_action.triggered.connect(self._show_mandamientos_tab)
 
     def _show_requerimientos_tab(self) -> None:
-        """Sólo para el Abogado -- el Agente del PAE usa las dos pantallas
+        """Sólo para el Abogado -- el Agente del PAE usa las pantallas
         separadas: ver `_show_generar_formato_tab` y `_show_revisar_formato_tab`."""
         widget = self._formato_widgets.get("requerimientos")
         if widget is None or self.tabs.indexOf(widget) == -1:
@@ -143,7 +158,7 @@ class MainWindow(QMainWindow):
             from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
 
             widget = RequerimientosGenerarView(self.user)
-            self.tabs.addTab(widget, "Generar formato")
+            self.tabs.addTab(widget, TAB_GENERAR_REQUERIMIENTO)
             self._formato_widgets["generar_formato"] = widget
         self.tabs.setCurrentWidget(widget)
 
@@ -156,7 +171,7 @@ class MainWindow(QMainWindow):
             widget.archivo_cambiado.connect(
                 lambda filename, w=widget: self._on_revision_filename_changed(w, filename)
             )
-            self.tabs.addTab(widget, "Revisar formato de abogado")
+            self.tabs.addTab(widget, TAB_REVISAR_REQUERIMIENTO)
             self._formato_widgets["revisar_formato"] = widget
         self.tabs.setCurrentWidget(widget)
 
@@ -170,8 +185,17 @@ class MainWindow(QMainWindow):
             widget.setProperty("base_tab_title", base_title)
         self.tabs.setTabText(index, f"{base_title} — {filename}" if filename else base_title)
 
+    def _show_generar_mandamiento_tab(self) -> None:
+        self._show_placeholder_tab("generar_mandamiento", TAB_GENERAR_MANDAMIENTO)
+
+    def _show_revisar_mandamiento_tab(self) -> None:
+        self._show_placeholder_tab("revisar_mandamiento", TAB_REVISAR_MANDAMIENTO)
+
     def _show_mandamientos_tab(self) -> None:
-        widget = self._formato_widgets.get("mandamientos")
+        self._show_placeholder_tab("mandamientos", "Mandamientos (próximamente)")
+
+    def _show_placeholder_tab(self, key: str, title: str) -> None:
+        widget = self._formato_widgets.get(key)
         if widget is None or self.tabs.indexOf(widget) == -1:
             widget = QLabel(
                 "El Formato de Mandamientos y los Reportes de Requerimientos/Mandamientos "
@@ -179,8 +203,8 @@ class MainWindow(QMainWindow):
             )
             widget.setWordWrap(True)
             widget.setContentsMargins(16, 16, 16, 16)
-            self.tabs.addTab(widget, "Mandamientos (próximamente)")
-            self._formato_widgets["mandamientos"] = widget
+            self.tabs.addTab(widget, title)
+            self._formato_widgets[key] = widget
         self.tabs.setCurrentWidget(widget)
 
     # --- Menú "Otros" (Agente del PAE / Abogado) ------------------------------------
@@ -240,7 +264,9 @@ class MainWindow(QMainWindow):
             generar_widget = self._viendo_como_widgets.get(generar_key)
             if generar_widget is None or self.tabs.indexOf(generar_widget) == -1:
                 generar_widget = RequerimientosGenerarView(target, simulate=True)
-                self.tabs.addTab(generar_widget, f"Viendo como: {target.full_name} — Generar formato")
+                self.tabs.addTab(
+                    generar_widget, f"Viendo como: {target.full_name} — {TAB_GENERAR_REQUERIMIENTO}"
+                )
                 self._viendo_como_widgets[generar_key] = generar_widget
 
             revisar_key = f"revisar:{target.id}"
@@ -250,7 +276,9 @@ class MainWindow(QMainWindow):
                 revisar_widget.archivo_cambiado.connect(
                     lambda filename, w=revisar_widget: self._on_revision_filename_changed(w, filename)
                 )
-                self.tabs.addTab(revisar_widget, f"Viendo como: {target.full_name} — Revisar formato de abogado")
+                self.tabs.addTab(
+                    revisar_widget, f"Viendo como: {target.full_name} — {TAB_REVISAR_REQUERIMIENTO}"
+                )
                 self._viendo_como_widgets[revisar_key] = revisar_widget
 
             self.tabs.setCurrentWidget(generar_widget)

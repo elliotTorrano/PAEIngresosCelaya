@@ -17,21 +17,38 @@ def _make_abogado():
     )
 
 
+def _import_rows(agente_id, *, source_filename, abogado_nombre=None, abogado_id=None, rows):
+    revision_import_id = revisiones_repo.create_revision_import(
+        agente_id=agente_id, source_filename=source_filename,
+        abogado_nombre=abogado_nombre, abogado_id=abogado_id,
+    )
+    revisiones_repo.add_revision_rows(
+        agente_id=agente_id, revision_import_id=revision_import_id,
+        source_filename=source_filename, abogado_nombre=abogado_nombre, abogado_id=abogado_id,
+        rows=rows,
+    )
+    return revision_import_id
+
+
+def _row(folio):
+    return {
+        "folio": folio, "cta_predial": None, "contribuyente": None, "domicilio": None,
+        "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
+        "fecha_notificacion": None, "quien_recibe": None, "quien_recibe_nombre": None,
+    }
+
+
 def test_add_and_list_revision_rows(db):
     agente = _make_agente()
     abogado = _make_abogado()
-    revisiones_repo.add_revision_rows(
-        agente_id=agente.id,
-        source_filename="captura_abogado1.xlsx",
-        abogado_nombre="Abogado Uno",
+    _import_rows(
+        agente.id, source_filename="captura_abogado1.xlsx", abogado_nombre="Abogado Uno",
         abogado_id=abogado.id,
-        rows=[
-            {
-                "folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1",
-                "fecha_citatorio": "01/01/2026", "recibe_citatorio": "EN PUERTA", "recibe_citatorio_nombre": None,
-                "fecha_notificacion": "02/01/2026", "quien_recibe": "EN PUERTA", "quien_recibe_nombre": None,
-            }
-        ],
+        rows=[{
+            "folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1",
+            "fecha_citatorio": "01/01/2026", "recibe_citatorio": "EN PUERTA", "recibe_citatorio_nombre": None,
+            "fecha_notificacion": "02/01/2026", "quien_recibe": "EN PUERTA", "quien_recibe_nombre": None,
+        }],
     )
 
     rows = revisiones_repo.list_revision_rows(agente.id)
@@ -42,18 +59,12 @@ def test_add_and_list_revision_rows(db):
     assert rows[0].fecha_citatorio == "01/01/2026"
     assert rows[0].procede is None
     assert rows[0].abogado_id == abogado.id
+    assert rows[0].revision_import_id is not None
 
 
 def test_update_revision_procede(db):
     agente = _make_agente()
-    revisiones_repo.add_revision_rows(
-        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre=None, abogado_id=None,
-        rows=[{
-            "folio": "F-001", "cta_predial": None, "contribuyente": None, "domicilio": None,
-            "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
-            "fecha_notificacion": None, "quien_recibe": None, "quien_recibe_nombre": None,
-        }],
-    )
+    _import_rows(agente.id, source_filename="x.xlsx", rows=[_row("F-001")])
     row_id = revisiones_repo.list_revision_rows(agente.id)[0].id
 
     revisiones_repo.update_revision_procede(row_id, "PROCEDE")
@@ -68,23 +79,64 @@ def test_list_revision_rows_filters_by_agente(db):
         username="agente2", role=ROLE_AGENTE_PAE, full_name="Agente Dos", email="a2@a.com",
         auth_type=AUTH_TYPE_CERTIFICADO,
     )
-    revisiones_repo.add_revision_rows(
-        agente_id=agente1.id, source_filename="a1.xlsx", abogado_nombre=None, abogado_id=None,
-        rows=[{
-            "folio": "F1", "cta_predial": None, "contribuyente": None, "domicilio": None,
-            "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
-            "fecha_notificacion": None, "quien_recibe": None, "quien_recibe_nombre": None,
-        }],
-    )
-    revisiones_repo.add_revision_rows(
-        agente_id=agente2.id, source_filename="a2.xlsx", abogado_nombre=None, abogado_id=None,
-        rows=[{
-            "folio": "F2", "cta_predial": None, "contribuyente": None, "domicilio": None,
-            "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
-            "fecha_notificacion": None, "quien_recibe": None, "quien_recibe_nombre": None,
-        }],
-    )
+    _import_rows(agente1.id, source_filename="a1.xlsx", rows=[_row("F1")])
+    _import_rows(agente2.id, source_filename="a2.xlsx", rows=[_row("F2")])
 
     rows1 = revisiones_repo.list_revision_rows(agente1.id)
     assert len(rows1) == 1
     assert rows1[0].folio == "F1"
+
+
+# --- Agrupación por archivo importado (revision_imports) -------------------------------
+
+def test_two_imports_stay_separated_by_revision_import_id(db):
+    agente = _make_agente()
+    import_id_1 = _import_rows(agente.id, source_filename="lote1.xlsx", rows=[_row("F1"), _row("F2")])
+    import_id_2 = _import_rows(agente.id, source_filename="lote2.xlsx", rows=[_row("F3")])
+
+    rows_1 = revisiones_repo.list_revision_rows_for_import(import_id_1)
+    rows_2 = revisiones_repo.list_revision_rows_for_import(import_id_2)
+
+    assert [r.folio for r in rows_1] == ["F1", "F2"]
+    assert [r.folio for r in rows_2] == ["F3"]
+    # El histórico consolidado sigue viendo todo (usado por "Exportar revisión").
+    assert len(revisiones_repo.list_revision_rows(agente.id)) == 3
+
+
+def test_list_revision_imports_reports_reviewed_progress(db):
+    agente = _make_agente()
+    import_id = _import_rows(agente.id, source_filename="lote1.xlsx", rows=[_row("F1"), _row("F2")])
+
+    imports = revisiones_repo.list_revision_imports(agente.id)
+    assert len(imports) == 1
+    assert imports[0].id == import_id
+    assert imports[0].total_rows == 2
+    assert imports[0].reviewed_rows == 0
+    assert imports[0].is_reviewed is False
+
+    rows = revisiones_repo.list_revision_rows_for_import(import_id)
+    revisiones_repo.update_revision_procede(rows[0].id, "PROCEDE")
+
+    imports = revisiones_repo.list_revision_imports(agente.id)
+    assert imports[0].reviewed_rows == 1
+    assert imports[0].is_reviewed is False  # falta una fila
+
+    revisiones_repo.update_revision_procede(rows[1].id, "NO PROCEDE")
+
+    imports = revisiones_repo.list_revision_imports(agente.id)
+    assert imports[0].reviewed_rows == 2
+    assert imports[0].is_reviewed is True
+
+
+def test_list_revision_imports_filters_by_agente(db):
+    agente1 = _make_agente()
+    agente2 = users_repo.create_user(
+        username="agente2", role=ROLE_AGENTE_PAE, full_name="Agente Dos", email="a2@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    _import_rows(agente1.id, source_filename="a1.xlsx", rows=[_row("F1")])
+    _import_rows(agente2.id, source_filename="a2.xlsx", rows=[_row("F2")])
+
+    imports1 = revisiones_repo.list_revision_imports(agente1.id)
+    assert len(imports1) == 1
+    assert imports1[0].source_filename == "a1.xlsx"

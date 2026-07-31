@@ -8,7 +8,7 @@ from pathlib import Path
 from app.db.connection import get_connection
 
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
-CURRENT_VERSION = 7
+CURRENT_VERSION = 8
 
 # Migraciones incrementales para bases de datos creadas con una versión anterior
 # del esquema. schema.sql ya crea las tablas nuevas "desde cero" con todo esto
@@ -41,6 +41,45 @@ _MIGRATIONS: dict[int, str | list[str]] = {
     5: "ALTER TABLE users ADD COLUMN cert_file_path TEXT",
     6: "ALTER TABLE requerimiento_batches ADD COLUMN finalizado INTEGER NOT NULL DEFAULT 0",
     7: "ALTER TABLE revision_rows ADD COLUMN abogado_id INTEGER REFERENCES users(id)",
+    8: [
+        # Antes, todas las filas importadas para revisión (de cualquier
+        # archivo, en cualquier momento) se mostraban juntas en una sola
+        # tabla -- al importar un segundo archivo, sus filas se "concatenaban"
+        # con las del primero en vez de verse por separado. `revision_imports`
+        # agrupa cada importación como un evento propio (como ya hace
+        # `requerimiento_batches` con los lotes), para poder mostrar y filtrar
+        # sólo el archivo que se está revisando en cada momento.
+        """CREATE TABLE IF NOT EXISTS revision_imports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agente_id INTEGER NOT NULL REFERENCES users(id),
+            source_filename TEXT NOT NULL,
+            abogado_nombre TEXT,
+            abogado_id INTEGER REFERENCES users(id),
+            imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_revision_imports_agente ON revision_imports(agente_id)",
+        "ALTER TABLE revision_rows ADD COLUMN revision_import_id INTEGER REFERENCES revision_imports(id)",
+        "CREATE INDEX IF NOT EXISTS idx_revision_rows_import ON revision_rows(revision_import_id)",
+        # Reconstruye un revision_imports por cada importación pasada,
+        # agrupando por (agente, archivo, abogado, fecha/hora exacta de
+        # importación) -- todas las filas de una misma llamada a
+        # add_revision_rows() comparten ese mismo datetime('now').
+        """INSERT INTO revision_imports (agente_id, source_filename, abogado_nombre, abogado_id, imported_at)
+            SELECT DISTINCT agente_id, source_filename, abogado_nombre, abogado_id, imported_at
+            FROM revision_rows
+            WHERE revision_import_id IS NULL""",
+        """UPDATE revision_rows
+            SET revision_import_id = (
+                SELECT ri.id FROM revision_imports ri
+                WHERE ri.agente_id = revision_rows.agente_id
+                  AND ri.source_filename = revision_rows.source_filename
+                  AND ri.imported_at = revision_rows.imported_at
+                  AND ri.abogado_id IS revision_rows.abogado_id
+                ORDER BY ri.id DESC
+                LIMIT 1
+            )
+            WHERE revision_import_id IS NULL""",
+    ],
 }
 
 
