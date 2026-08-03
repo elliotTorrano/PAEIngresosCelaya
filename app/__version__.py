@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.26.0"
+__version__ = "0.28.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -279,4 +279,28 @@ VERSION_NOTES = {
               "oficial). El Abogado no tiene acceso a 'Colores': siempre "
               "ve la interfaz con lo que esté guardado en ese momento, sin "
               "poder cambiarlo.",
+    "0.27.0": "Nuevas cuentas de prueba para el piloto alpha con usuarios "
+              "finales: 'agente_dummy' y 'abogado_dummy', contraseña "
+              "'dummy12345' -- se crean solas en cualquier instalación, "
+              "igual que el súper-usuario/Administrador. Con ellas se "
+              "puede probar el flujo completo de Generar/Revisar/Capturar "
+              "Requerimientos y Mandamientos, pero nada de lo que se haga "
+              "se guarda (modo simulación forzado, como en 'Ver como'). "
+              "Tampoco se puede cambiar su correo, contraseña ni "
+              "certificado desde 'Datos de cuenta', ni guardar cambios de "
+              "color desde 'Colores' (agente_dummy) -- para que la cuenta "
+              "compartida siga siendo utilizable indefinidamente con la "
+              "misma contraseña. El título de la ventana avisa 'CUENTA DE "
+              "PRUEBA, NADA SE GUARDA' mientras se usan.",
+    "0.28.0": "'Generar Formato' (Requerimiento y Mandamiento) para las "
+              "cuentas de prueba ('agente_dummy') ahora genera un archivo "
+              "real (.mcdiep + PDF) en vez de simularlo por completo: sin "
+              "certificado ni firma, acotado a una sola página (máximo 8 "
+              "filas), con UUID y Hash mostrando 'USUARIO PRUEBA' en vez de "
+              "un identificador real, sin código QR, y con una marca de "
+              "agua diagonal 'PAE PRUEBA - {nombre del agente}' en toda la "
+              "hoja. Sigue sin guardarse nada en la base de datos -- el "
+              "archivo generado sólo sirve para revisar visualmente el "
+              "formato. 'Revisar Formato' y la captura del 'abogado_dummy' "
+              "siguen en modo simulación completa (sin archivo real).",
 }

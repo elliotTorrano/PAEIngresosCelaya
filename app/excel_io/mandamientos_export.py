@@ -28,10 +28,11 @@ HEADERS_REVISION = HEADERS_ABOGADO + ["Procede", "ID Abogado"]
 
 
 def build_agente_envelope(
-    rows: list[dict], *, agente: User, abogado: User, private_key, document_uuid: str | None = None,
+    rows: list[dict], *, agente: User, abogado: User, private_key=None, document_uuid: str | None = None,
 ) -> mcdiep_format.McdiepEnvelope:
     """Arma (sin escribir a disco) el envelope firmado Agente -> Abogado. Ver
-    app/excel_io/requerimientos_export.py::build_agente_envelope."""
+    app/excel_io/requerimientos_export.py::build_agente_envelope. `private_key=None`
+    deja el envelope sin firmar -- sólo para agente_dummy (sin certificado)."""
     payload = {
         "headers": HEADERS_AGENTE,
         "rows": [
@@ -44,7 +45,7 @@ def build_agente_envelope(
         ],
     }
     signable = mcdiep_format.signable_bytes(mcdiep_format.KIND_AGENTE_TO_ABOGADO, abogado.username, payload)
-    signature = sign_challenge(private_key, signable)
+    signature = sign_challenge(private_key, signable) if private_key is not None else None
 
     return mcdiep_format.McdiepEnvelope(
         kind=mcdiep_format.KIND_AGENTE_TO_ABOGADO,

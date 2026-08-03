@@ -2,14 +2,19 @@
 su usuario y nombre completo, y actualizar su correo. Además, según cómo se
 autentiquen, cada uno puede renovar su propia credencial sin depender de
 nadie más: el Agente (certificado) puede generar uno nuevo, y el Abogado
-(contraseña) puede cambiarla."""
+(contraseña) puede cambiarla.
+
+Excepción: las cuentas de prueba (agente_dummy/abogado_dummy, ver
+app/config.py::DUMMY_USERNAMES) no pueden cambiar correo, contraseña ni
+certificado -- son compartidas entre quien haga la prueba, así que deben
+seguir siendo utilizables indefinidamente con la contraseña fija conocida."""
 
 from __future__ import annotations
 
 from PySide6.QtWidgets import QDialog, QGroupBox, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
 from app.auth.passwords import hash_password, verify_password
-from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD
+from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, is_dummy_user
 from app.db.repositories import users as users_repo
 from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
 
@@ -18,10 +23,26 @@ class SimpleAccountView(QWidget):
     def __init__(self, user: users_repo.User, parent=None):
         super().__init__(parent)
         self.user = user
+        self.is_dummy = is_dummy_user(user)
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"Usuario: {user.username}"))
         layout.addWidget(QLabel(f"Nombre completo: {user.full_name}"))
+
+        if self.is_dummy:
+            banner = QLabel(
+                "Cuenta de prueba: correo, contraseña y certificado son fijos y no se "
+                "pueden cambiar aquí, para que esta cuenta compartida siga funcionando "
+                "con la contraseña conocida."
+            )
+            banner.setWordWrap(True)
+            banner.setStyleSheet(
+                "background-color: rgba(255, 224, 138, 0.9); padding: 6px; border-radius: 4px;"
+            )
+            layout.addWidget(banner)
+            layout.addWidget(QLabel(f"Correo electrónico: {user.email or '(sin correo)'}"))
+            layout.addStretch()
+            return
 
         layout.addWidget(QLabel("Correo electrónico:"))
         self.email_input = QLineEdit(user.email or "")

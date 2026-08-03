@@ -1,5 +1,42 @@
 # Historial de versiones — Sistema PAE
 
+## 0.28.0
+
+- **"Generar Formato" (Requerimiento y Mandamiento) para `agente_dummy`**
+  ahora genera un archivo real (.mcdiep + PDF), en vez de simularlo por
+  completo:
+  - Sin certificado ni firma digital (la cuenta de prueba no tiene
+    certificado).
+  - Acotado a una sola página -- máximo 8 filas por exportación de prueba.
+  - El UUID y el Hash muestran literalmente **"USUARIO PRUEBA"** en vez de
+    calcularse de verdad -- no hay generación real de UUID, hash ni QR.
+  - Marca de agua diagonal semi-transparente **"PAE PRUEBA - {nombre del
+    agente}"** repetida en toda la hoja.
+  - Sigue sin guardar nada en la base de datos: el archivo generado es sólo
+    para revisar visualmente el formato, no queda ningún registro asociado.
+- "Revisar Formato" (Agente) y la captura del `abogado_dummy` siguen en
+  modo simulación completa, sin generar ningún archivo real -- esa parte
+  del flujo no cambió en esta versión.
+
+## 0.27.0
+
+- Nuevas **cuentas de prueba** para el piloto alpha con usuarios finales:
+  `agente_dummy` (rol Agente del PAE) y `abogado_dummy` (rol Abogado), ambas
+  con contraseña `dummy12345`. Se crean solas en cualquier instalación al
+  arrancar el programa -- igual que el súper-usuario/Administrador -- sin
+  necesitar que nadie las dé de alta a mano.
+- Con estas cuentas se puede probar el flujo completo de Generar/Revisar
+  formato y Capturar (Requerimientos y Mandamientos), pero **nada de lo que
+  se haga con ellas se guarda**: corren siempre en modo simulación (el mismo
+  mecanismo que ya usaba "Ver como" para el Súper-usuario), y el título de
+  la ventana avisa "CUENTA DE PRUEBA, NADA SE GUARDA" mientras están
+  activas.
+- Tampoco se puede cambiar su correo, contraseña ni certificado desde
+  "Datos de cuenta" (queda reemplazado por un aviso), ni guardar cambios de
+  color desde "Colores" (para `agente_dummy`) -- así la cuenta compartida
+  sigue siendo utilizable indefinidamente con la misma contraseña conocida,
+  sin importar cuántas personas la usen para probar.
+
 ## 0.26.0
 
 - El **Agente del PAE** ya tiene acceso propio a "Colores" desde el menú

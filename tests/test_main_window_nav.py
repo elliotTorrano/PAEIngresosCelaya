@@ -1,6 +1,9 @@
+from app.auth.dummy_accounts import ensure_dummy_accounts
 from app.config import (
     AUTH_TYPE_CERTIFICADO,
     AUTH_TYPE_PASSWORD,
+    DUMMY_ABOGADO_USERNAME,
+    DUMMY_AGENTE_USERNAME,
     ROLE_ABOGADO,
     ROLE_ADMINISTRADOR,
     ROLE_AGENTE_PAE,
@@ -178,6 +181,63 @@ def test_show_colores_tab_for_agente_is_interface_only(qapp, db):
     window.tabs.setCurrentIndex(0)
     window._show_colores_tab()
     assert _tab_titles(window).count("Colores") == 1
+
+
+# --- Cuentas de prueba (agente_dummy / abogado_dummy) ---------------------------------
+
+def test_dummy_agente_window_marks_title_and_forces_dummy_or_simulate(qapp, db):
+    ensure_dummy_accounts()
+    dummy = users_repo.get_by_username(DUMMY_AGENTE_USERNAME)
+    window = MainWindow(dummy)
+
+    assert window.is_dummy is True
+    assert "CUENTA DE PRUEBA" in window.windowTitle()
+
+    # Generar Formato: exportación real acotada (identidad de prueba, sin
+    # certificado), no la simulación completamente falsa de "Ver como".
+    window._show_generar_formato_tab()
+    generar = window._formato_widgets["generar_formato"]
+    assert generar.simulate is False
+    assert generar.dummy is True
+
+    window._show_generar_mandamiento_tab()
+    generar_mand = window._formato_widgets["generar_mandamiento"]
+    assert generar_mand.simulate is False
+    assert generar_mand.dummy is True
+
+    # Revisar Formato sigue en modo simulación (no requiere lote real).
+    window._show_revisar_formato_tab()
+    assert window._formato_widgets["revisar_formato"].simulate is True
+
+    window._show_revisar_mandamiento_tab()
+    assert window._formato_widgets["revisar_mandamiento"].simulate is True
+
+    window._show_colores_tab()
+    assert window._otros_widgets["colores"].allow_save is False
+
+
+def test_dummy_abogado_window_forces_simulate(qapp, db):
+    ensure_dummy_accounts()
+    dummy = users_repo.get_by_username(DUMMY_ABOGADO_USERNAME)
+    window = MainWindow(dummy)
+
+    assert window.is_dummy is True
+
+    window._show_requerimientos_tab()
+    assert window._formato_widgets["requerimientos"].simulate is True
+
+    window._show_mandamientos_tab()
+    assert window._formato_widgets["mandamientos"].simulate is True
+
+
+def test_real_agente_window_is_not_dummy(qapp, db):
+    window = MainWindow(_make_agente())
+    assert window.is_dummy is False
+    assert "CUENTA DE PRUEBA" not in window.windowTitle()
+
+    window._show_generar_formato_tab()
+    assert window._formato_widgets["generar_formato"].simulate is False
+    assert window._formato_widgets["generar_formato"].dummy is False
 
 
 def test_historico_menu_shows_and_reuses_tab(qapp, db):

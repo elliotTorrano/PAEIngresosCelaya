@@ -12,10 +12,14 @@ from pathlib import Path
 from app.db.repositories.mandamientos import MandamientoRow
 from app.db.repositories.users import User
 from app.pdf_io.requerimientos_pdf import (  # noqa: F401 -- re-exportados para uso simétrico desde la UI
+    DUMMY_LABEL,
+    DUMMY_MAX_ROWS,
     DocumentIdentity,
     _render_pdf,
     compute_identity,
+    dummy_identity,
     new_document_uuid,
+    suggested_dummy_filename,
     suggested_filename,
 )
 
@@ -31,6 +35,7 @@ HEADERS_ABOGADO = HEADERS_AGENTE + [
 
 def export_agente_pdf(
     pdf_path: Path, *, agente: User, abogado: User, rows: list[dict], filename: str, identity: DocumentIdentity,
+    dummy: bool = False, watermark_text: str | None = None,
 ) -> None:
     """PDF que acompaña la exportación del Agente. Ver
     app/pdf_io/requerimientos_pdf.py::export_agente_pdf."""
@@ -43,6 +48,7 @@ def export_agente_pdf(
         headers=HEADERS_AGENTE, table_rows=table_rows, quien_recibe_values=[None] * len(rows),
         total_mode="all", include_notificacion_counters=False, identity=identity,
         formato_titulo=FORMATO_TITULO, documento_titulo=DOCUMENTO_TITULO,
+        dummy=dummy, watermark_text=watermark_text,
     )
 
 

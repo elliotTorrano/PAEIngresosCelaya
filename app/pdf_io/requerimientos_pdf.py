@@ -67,6 +67,10 @@ _STYLE_QR_LABEL = ParagraphStyle(
 )
 
 
+DUMMY_LABEL = "USUARIO PRUEBA"
+DUMMY_MAX_ROWS = 8
+
+
 @dataclass
 class DocumentIdentity:
     """Identificador del documento generado, al estilo del folio fiscal/sello
@@ -104,6 +108,24 @@ def compute_identity(mcdiep_bytes: bytes, *, document_uuid: str, private_key=Non
         uuid=document_uuid, file_hash=file_hash,
         timestamp=datetime.now(), signature_b64=signature_b64,
     )
+
+
+def dummy_identity() -> DocumentIdentity:
+    """Identidad placeholder para exportaciones de las cuentas de prueba
+    (agente_dummy/abogado_dummy, ver app/config.py::DUMMY_USERNAMES): sin
+    cálculo real de UUID ni hash (ni firma, porque estas cuentas no tienen
+    certificado) -- deja a la vista, en el propio documento, que es sólo de
+    prueba y no un documento oficial."""
+    return DocumentIdentity(uuid=DUMMY_LABEL, file_hash=DUMMY_LABEL, timestamp=datetime.now(), signature_b64=None)
+
+
+def suggested_dummy_filename(*, agente_nombre: str, abogado_nombre: str, extension: str) -> str:
+    """Nombre sugerido para exportaciones de prueba -- sin UUID/hash embebidos
+    (no existen de verdad, ver `dummy_identity`), para no confundirlo con el
+    nombre de un documento oficial."""
+    fecha = datetime.now().strftime("%d/%m/%Y")
+    raw = f"PRUEBA_{agente_nombre}_{abogado_nombre} {fecha}"
+    return sanitize_filename(raw) + extension
 
 
 def suggested_filename(*, agente_nombre: str, abogado_nombre: str, identity: DocumentIdentity, extension: str) -> str:
@@ -154,6 +176,7 @@ def _build_header_table(
     available_width: float, *, abogado_nombre: str, counts: dict[str, int],
     include_notificacion_counters: bool, identity: DocumentIdentity,
     formato_titulo: str = "FORMATO: ENTREGA DE REQUERIMIENTOS DE PAGO",
+    dummy: bool = False,
 ) -> Table:
     fecha = datetime.now().strftime("%d/%m/%Y")
     counter_lines = []
@@ -167,14 +190,23 @@ def _build_header_table(
 
     # Columna izquierda: el escudo y, debajo, el QR de esta primera página
     # (en las páginas siguientes el QR va al pie -- ver _make_footer_drawer).
-    qr_payload = f"UUID: {identity.uuid[:8]}\nHash: {identity.file_hash[:10]}"
-    left_cell = [
-        _header_image(),
-        Spacer(1, 4),
-        _qr_drawing(qr_payload, 0.55 * inch),
-        Paragraph(f"UUID: {identity.uuid[:8]}", _STYLE_QR_LABEL),
-        Paragraph(f"Hash: {identity.file_hash[:10]}", _STYLE_QR_LABEL),
-    ]
+    # Las exportaciones de prueba (dummy) no llevan QR ni UUID/hash reales.
+    if dummy:
+        left_cell = [
+            _header_image(),
+            Spacer(1, 4),
+            Paragraph(f"UUID: {identity.uuid}", _STYLE_QR_LABEL),
+            Paragraph(f"Hash: {identity.file_hash}", _STYLE_QR_LABEL),
+        ]
+    else:
+        qr_payload = f"UUID: {identity.uuid[:8]}\nHash: {identity.file_hash[:10]}"
+        left_cell = [
+            _header_image(),
+            Spacer(1, 4),
+            _qr_drawing(qr_payload, 0.55 * inch),
+            Paragraph(f"UUID: {identity.uuid[:8]}", _STYLE_QR_LABEL),
+            Paragraph(f"Hash: {identity.file_hash[:10]}", _STYLE_QR_LABEL),
+        ]
 
     data = [
         [left_cell, Paragraph("MUNICIPIO DE CELAYA GUANAJUATO", _STYLE_TITLE), ""],
@@ -260,18 +292,13 @@ def _qr_drawing(payload: str, size: float) -> Drawing:
 
 def _build_stamp_section(
     available_width: float, *, identity: DocumentIdentity, agente_nombre: str, abogado_nombre: str,
-    filename: str,
+    filename: str, dummy: bool = False,
 ) -> Table:
     """Sello del documento al estilo CFDI: QR a la izquierda (UUID, agente,
     archivo y los primeros 10 caracteres del hash) y, a un lado, el detalle
     en texto -- incluida la cadena de la firma cuando la exportación se hizo
-    con certificado (flujo del Agente); si no, se indica que no hay firma."""
-    qr_payload = (
-        f"UUID: {identity.uuid}\n"
-        f"Agente: {agente_nombre}\n"
-        f"Archivo: {filename}\n"
-        f"Hash: {identity.file_hash[:10]}"
-    )
+    con certificado (flujo del Agente); si no, se indica que no hay firma.
+    Las exportaciones de prueba (dummy) no llevan QR ni hash/UUID reales."""
     qr_size = 0.85 * inch
     firma_texto = identity.signature_b64 or "Sin firma digital (exportación sin certificado)"
 
@@ -285,8 +312,19 @@ def _build_stamp_section(
         Paragraph(f"<b>Firma digital del certificado:</b> {firma_texto}", _STYLE_STAMP_MONO),
     ]
 
+    if dummy:
+        left_cell = Paragraph("<b>DOCUMENTO<br/>DE PRUEBA</b><br/>(sin QR)", _STYLE_QR_LABEL)
+    else:
+        qr_payload = (
+            f"UUID: {identity.uuid}\n"
+            f"Agente: {agente_nombre}\n"
+            f"Archivo: {filename}\n"
+            f"Hash: {identity.file_hash[:10]}"
+        )
+        left_cell = _qr_drawing(qr_payload, qr_size)
+
     table = Table(
-        [[_qr_drawing(qr_payload, qr_size), info_cell]],
+        [[left_cell, info_cell]],
         colWidths=[qr_size + 12, available_width - qr_size - 12],
     )
     table.setStyle(TableStyle([
@@ -305,11 +343,25 @@ def _noop_page(canvas, doc) -> None:
     cuadro de la cabecera, debajo del escudo (ver _build_header_table)."""
 
 
-def _make_footer_qr(identity: DocumentIdentity):
+def _make_footer_qr(identity: DocumentIdentity, *, dummy: bool = False):
     """QR + identificadores cortos al pie, a la izquierda, en las páginas
-    2 en adelante (la primera lleva su QR dentro de la cabecera)."""
-    qr_payload = f"UUID: {identity.uuid[:8]}\nHash: {identity.file_hash[:10]}"
+    2 en adelante (la primera lleva su QR dentro de la cabecera). Las
+    exportaciones de prueba (dummy) no llevan QR ni hash/UUID reales."""
     qr_size = 0.42 * inch
+
+    if dummy:
+        def _draw(canvas, doc) -> None:
+            canvas.saveState()
+            x = doc.leftMargin
+            y = (BOTTOM_MARGIN - qr_size) / 2
+            canvas.setFont("Helvetica", 7.5)
+            canvas.drawString(x, y + qr_size * 0.62, f"UUID: {identity.uuid}")
+            canvas.drawString(x, y + qr_size * 0.18, f"Hash: {identity.file_hash}")
+            canvas.restoreState()
+
+        return _draw
+
+    qr_payload = f"UUID: {identity.uuid[:8]}\nHash: {identity.file_hash[:10]}"
 
     def _draw(canvas, doc) -> None:
         canvas.saveState()
@@ -323,6 +375,20 @@ def _make_footer_qr(identity: DocumentIdentity):
         canvas.restoreState()
 
     return _draw
+
+
+def _draw_watermark(canvas, doc, text: str) -> None:
+    """Marca de agua diagonal semi-transparente, repetida en cada página --
+    para que un documento de prueba (cuentas dummy) nunca se confunda con
+    uno oficial a simple vista."""
+    canvas.saveState()
+    canvas.setFont("Helvetica-Bold", 44)
+    canvas.setFillColor(colors.Color(0.55, 0.55, 0.55, alpha=0.35))
+    width, height = doc.pagesize
+    canvas.translate(width / 2, height / 2)
+    canvas.rotate(30)
+    canvas.drawCentredString(0, 0, text)
+    canvas.restoreState()
 
 
 def _apply_duplex_long_edge(pdf_path: Path) -> None:
@@ -341,6 +407,7 @@ def _render_pdf(
     include_notificacion_counters: bool, identity: DocumentIdentity,
     formato_titulo: str = "FORMATO: ENTREGA DE REQUERIMIENTOS DE PAGO",
     documento_titulo: str = "Entrega de Requerimientos de Pago",
+    dummy: bool = False, watermark_text: str | None = None,
 ) -> None:
     counts = _compute_counts(quien_recibe_values, total_mode=total_mode)
     doc = SimpleDocTemplate(
@@ -352,22 +419,36 @@ def _render_pdf(
         _build_header_table(
             doc.width, abogado_nombre=abogado_nombre, counts=counts,
             include_notificacion_counters=include_notificacion_counters, identity=identity,
-            formato_titulo=formato_titulo,
+            formato_titulo=formato_titulo, dummy=dummy,
         ),
         Spacer(1, 10),
         _build_body_table(doc.width, headers, table_rows),
         Spacer(1, 10),
         _build_stamp_section(
             doc.width, identity=identity, agente_nombre=agente_nombre,
-            abogado_nombre=abogado_nombre, filename=filename,
+            abogado_nombre=abogado_nombre, filename=filename, dummy=dummy,
         ),
     ]
-    doc.build(story, onFirstPage=_noop_page, onLaterPages=_make_footer_qr(identity))
+
+    def _first_page(canvas, doc_) -> None:
+        _noop_page(canvas, doc_)
+        if watermark_text:
+            _draw_watermark(canvas, doc_, watermark_text)
+
+    footer_draw = _make_footer_qr(identity, dummy=dummy)
+
+    def _later_pages(canvas, doc_) -> None:
+        footer_draw(canvas, doc_)
+        if watermark_text:
+            _draw_watermark(canvas, doc_, watermark_text)
+
+    doc.build(story, onFirstPage=_first_page, onLaterPages=_later_pages)
     _apply_duplex_long_edge(pdf_path)
 
 
 def export_agente_pdf(
     pdf_path: Path, *, agente: User, abogado: User, rows: list[dict], filename: str, identity: DocumentIdentity,
+    dummy: bool = False, watermark_text: str | None = None,
 ) -> None:
     """PDF que acompaña la exportación del Agente (export_for_abogado) --
     en esta etapa todavía no hay captura, así que sólo se muestra el total
@@ -375,7 +456,8 @@ def export_agente_pdf(
     real porque este flujo ya pide el certificado del Agente para firmar el
     .mcdiep -- `identity` debe venir de `compute_identity` con ese mismo
     certificado, calculada antes de escribir el .mcdiep (ver
-    `suggested_filename`)."""
+    `suggested_filename`). `dummy`/`watermark_text`: exportaciones de prueba
+    de las cuentas agente_dummy/abogado_dummy -- ver `dummy_identity`."""
     table_rows = [
         [row["folio"] or "", row["cta_predial"] or "", row["contribuyente"] or "", row["domicilio"] or ""]
         for row in rows
@@ -384,6 +466,7 @@ def export_agente_pdf(
         pdf_path, agente_nombre=agente.full_name, abogado_nombre=abogado.full_name, filename=filename,
         headers=HEADERS_AGENTE, table_rows=table_rows, quien_recibe_values=[None] * len(rows),
         total_mode="all", include_notificacion_counters=False, identity=identity,
+        dummy=dummy, watermark_text=watermark_text,
     )
 
 

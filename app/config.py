@@ -34,6 +34,22 @@ AUTH_TYPE_PASSWORD = "PASSWORD"
 # Roles que además pueden actuar como Agente del PAE
 ROLES_CAN_ACT_AS_AGENTE = (ROLE_SUPERUSUARIO, ROLE_ADMINISTRADOR)
 
+# Cuentas de prueba fijas para el piloto alpha con usuarios finales -- se
+# siembran automáticamente en cualquier instalación (ver
+# app/auth/dummy_accounts.py), con esta contraseña conocida, para que
+# cualquier persona pueda entrar a probar sin necesitar que alguien más la
+# dé de alta ni le genere un certificado. Nada de lo que se haga con ellas
+# se guarda: ver app/ui/main_window.py, donde se fuerza `simulate=True` en
+# Formato (Generar/Revisar/Captura) y se bloquea Datos de cuenta.
+DUMMY_AGENTE_USERNAME = "agente_dummy"
+DUMMY_ABOGADO_USERNAME = "abogado_dummy"
+DUMMY_USERNAMES = (DUMMY_AGENTE_USERNAME, DUMMY_ABOGADO_USERNAME)
+DUMMY_PASSWORD = "dummy12345"
+
+
+def is_dummy_user(user) -> bool:
+    return getattr(user, "username", None) in DUMMY_USERNAMES
+
 BATCH_STATUS_PENDIENTE_ABOGADO = "PENDIENTE_ABOGADO"
 BATCH_STATUS_CAPTURADO = "CAPTURADO"
 BATCH_STATUS_EXPORTADO = "EXPORTADO"

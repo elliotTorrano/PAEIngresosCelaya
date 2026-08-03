@@ -40,15 +40,23 @@ _SWATCH_BASE_STYLE = "border: 1px solid #999; border-radius: 3px;"
 
 
 class ColorSettingsView(QWidget):
-    def __init__(self, user: User, parent=None, allow_pdf: bool = True):
+    def __init__(self, user: User, parent=None, allow_pdf: bool = True, allow_save: bool = True):
         super().__init__(parent)
         self.user = user
         self.allow_pdf = allow_pdf
+        self.allow_save = allow_save
         self._swatches: dict[str, QLabel] = {}
         self._inputs: dict[str, QLineEdit] = {}
 
         layout = QVBoxLayout(self)
-        if allow_pdf:
+        if not allow_save:
+            intro = (
+                "Cuenta de prueba: puede probar 'Aplicar (vista previa)' para ver los "
+                "colores en pantalla, pero no puede guardarlos -- esta cuenta es "
+                "compartida y sus cambios nunca se conservan más allá de la sesión "
+                "actual."
+            )
+        elif allow_pdf:
             intro = (
                 "Personalice los 3 colores base del programa (formato #RRGGBB). "
                 "'Aplicar' los prueba de inmediato en TODAS las ventanas abiertas "
@@ -103,12 +111,13 @@ class ColorSettingsView(QWidget):
         apply_btn.clicked.connect(self._on_apply_preview)
         btn_row.addWidget(apply_btn)
 
-        save_interface_btn = QPushButton("Guardar cambios de interfaz")
-        save_interface_btn.setProperty("role", "primary")
-        save_interface_btn.clicked.connect(self._on_save_interface)
-        btn_row.addWidget(save_interface_btn)
+        if allow_save:
+            save_interface_btn = QPushButton("Guardar cambios de interfaz")
+            save_interface_btn.setProperty("role", "primary")
+            save_interface_btn.clicked.connect(self._on_save_interface)
+            btn_row.addWidget(save_interface_btn)
 
-        if allow_pdf:
+        if allow_pdf and allow_save:
             save_pdf_btn = QPushButton("Guardar cambios del PDF")
             save_pdf_btn.setProperty("role", "primary")
             save_pdf_btn.clicked.connect(self._on_save_pdf)

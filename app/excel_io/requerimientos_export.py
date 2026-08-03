@@ -29,7 +29,7 @@ HEADERS_REVISION = HEADERS_ABOGADO + ["Procede", "ID Abogado"]
 
 
 def build_agente_envelope(
-    rows: list[dict], *, agente: User, abogado: User, private_key, document_uuid: str | None = None,
+    rows: list[dict], *, agente: User, abogado: User, private_key=None, document_uuid: str | None = None,
 ) -> mcdiep_format.McdiepEnvelope:
     """Arma (sin escribir a disco) el envelope firmado Agente -> Abogado --
     separado de `export_for_abogado` para poder calcular el hash/identidad
@@ -38,7 +38,10 @@ def build_agente_envelope(
     (con app.pdf_io.requerimientos_pdf.new_document_uuid()) cuando quien
     exporta necesita ese mismo UUID para el PDF/nombre de archivo -- si se
     omite, se genera uno aquí (sólo para llamadas simples que no necesitan
-    coordinarlo con nada más)."""
+    coordinarlo con nada más). `private_key=None` deja el envelope sin firmar
+    -- sólo para las cuentas de prueba (agente_dummy, ver
+    app/config.py::DUMMY_USERNAMES), que no tienen certificado; el flujo
+    normal del Agente del PAE siempre pasa su certificado real."""
     payload = {
         "headers": HEADERS_AGENTE,
         "rows": [
@@ -52,7 +55,7 @@ def build_agente_envelope(
         ],
     }
     signable = mcdiep_format.signable_bytes(mcdiep_format.KIND_AGENTE_TO_ABOGADO, abogado.username, payload)
-    signature = sign_challenge(private_key, signable)
+    signature = sign_challenge(private_key, signable) if private_key is not None else None
 
     return mcdiep_format.McdiepEnvelope(
         kind=mcdiep_format.KIND_AGENTE_TO_ABOGADO,

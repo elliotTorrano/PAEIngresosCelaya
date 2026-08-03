@@ -4,7 +4,14 @@ from PySide6.QtWidgets import QDialog, QPushButton
 
 from app.auth.enrollment import enroll_certificate
 from app.auth.passwords import hash_password, verify_password
-from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
+from app.config import (
+    AUTH_TYPE_CERTIFICADO,
+    AUTH_TYPE_PASSWORD,
+    DUMMY_ABOGADO_USERNAME,
+    DUMMY_AGENTE_USERNAME,
+    ROLE_ABOGADO,
+    ROLE_AGENTE_PAE,
+)
 from app.db.repositories import users as users_repo
 from app.ui.widgets.simple_account_view import SimpleAccountView
 
@@ -148,6 +155,32 @@ def test_abogado_change_password_mismatch(qapp, db):
         view._on_change_password()
 
     mock_warning.assert_called_once()
+
+
+def test_dummy_agente_view_hides_email_and_certificate_controls(qapp, db):
+    pwd_hash, salt = hash_password("dummy12345")
+    dummy = users_repo.create_user(
+        username=DUMMY_AGENTE_USERNAME, role=ROLE_AGENTE_PAE, full_name="Agente del PAE (prueba)",
+        email=None, auth_type=AUTH_TYPE_PASSWORD, password_hash=pwd_hash, password_salt=salt,
+    )
+    view = SimpleAccountView(dummy)
+
+    assert not hasattr(view, "email_input")
+    assert not hasattr(view, "current_password_input")
+    assert not _has_button(view, "Guardar correo")
+    assert not _has_button(view, "Generar nuevo certificado")
+
+
+def test_dummy_abogado_view_hides_password_controls(qapp, db):
+    pwd_hash, salt = hash_password("dummy12345")
+    dummy = users_repo.create_user(
+        username=DUMMY_ABOGADO_USERNAME, role=ROLE_ABOGADO, full_name="Abogado (prueba)",
+        email=None, auth_type=AUTH_TYPE_PASSWORD, password_hash=pwd_hash, password_salt=salt,
+    )
+    view = SimpleAccountView(dummy)
+
+    assert not hasattr(view, "current_password_input")
+    assert not _has_button(view, "Cambiar contraseña")
 
 
 def test_abogado_change_password_too_short(qapp, db):

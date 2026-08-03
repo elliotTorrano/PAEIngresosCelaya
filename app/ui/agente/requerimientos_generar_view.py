@@ -32,10 +32,11 @@ from app.utils.paths import exports_dir
 
 
 class RequerimientosGenerarView(QWidget):
-    def __init__(self, agente_user: users_repo.User, parent=None, simulate: bool = False):
+    def __init__(self, agente_user: users_repo.User, parent=None, simulate: bool = False, dummy: bool = False):
         super().__init__(parent)
         self.agente_user = agente_user
         self.simulate = simulate
+        self.dummy = dummy
         self._rows: list[dict] = []
         self._source_filenames: list[str] = []
 
@@ -46,6 +47,17 @@ class RequerimientosGenerarView(QWidget):
                 "Modo simulación: puede probar el flujo completo, pero nada de lo que haga "
                 "aquí se guarda."
             )
+            banner.setStyleSheet(
+                "background-color: rgba(255, 224, 138, 0.9); padding: 6px; border-radius: 4px;"
+            )
+            layout.addWidget(banner)
+        elif self.dummy:
+            banner = QLabel(
+                "Cuenta de prueba: al exportar se genera un archivo real (una sola página, "
+                "sin certificado ni firma, con UUID/hash de prueba y marca de agua), pero "
+                "nada queda registrado en la base de datos del programa."
+            )
+            banner.setWordWrap(True)
             banner.setStyleSheet(
                 "background-color: rgba(255, 224, 138, 0.9); padding: 6px; border-radius: 4px;"
             )
@@ -127,7 +139,7 @@ class RequerimientosGenerarView(QWidget):
             self._source_filenames.append(path.name)
             already_in_batch.add(path.name)
 
-            if not self.simulate:
+            if not self.simulate and not self.dummy:
                 # Histórico permanente de subidas: quién, cuándo y cuántas filas.
                 # No se restringe por repetición -- eso sólo aplica al lote en curso.
                 req_repo.record_imported_file(
@@ -187,6 +199,58 @@ class RequerimientosGenerarView(QWidget):
                 self, "Simulación",
                 f"Se habrían exportado {len(self._rows)} filas para {abogado.full_name}. "
                 "No se guardó ni exportó nada de verdad.",
+            )
+        elif self.dummy:
+            proceed = QMessageBox.question(
+                self, "Confirmar exportación de prueba",
+                f"Se generará un archivo de prueba real (máximo {requerimientos_pdf.DUMMY_MAX_ROWS} "
+                "filas, una sola página, sin certificado ni firma, con UUID/hash de prueba y "
+                "marca de agua) para verificar el formato. No queda registrado nada en la base "
+                "de datos.\n\n¿Continuar?",
+            )
+            if proceed != QMessageBox.StandardButton.Yes:
+                return
+
+            dummy_rows = self._rows[: requerimientos_pdf.DUMMY_MAX_ROWS]
+            identity = requerimientos_pdf.dummy_identity()
+            envelope = build_agente_envelope(
+                dummy_rows, agente=self.agente_user, abogado=abogado,
+                private_key=None, document_uuid=identity.uuid,
+            )
+            mcdiep_bytes = mcdiep_format.envelope_bytes(envelope)
+            filename = requerimientos_pdf.suggested_dummy_filename(
+                agente_nombre=self.agente_user.full_name, abogado_nombre=abogado.full_name,
+                extension=mcdiep_format.EXTENSION,
+            )
+            folder = QFileDialog.getExistingDirectory(
+                self, "Elegir carpeta para guardar el archivo de prueba", str(exports_dir())
+            )
+            if not folder:
+                return
+            output_path = Path(folder) / filename
+
+            if output_path.exists():
+                overwrite = QMessageBox.question(
+                    self, "El archivo ya existe",
+                    f"Ya existe un archivo con ese nombre en la carpeta elegida:\n{output_path.name}"
+                    "\n\n¿Reemplazarlo?",
+                )
+                if overwrite != QMessageBox.StandardButton.Yes:
+                    return
+
+            output_path.write_bytes(mcdiep_bytes)
+            pdf_path = output_path.with_suffix(".pdf")
+            requerimientos_pdf.export_agente_pdf(
+                pdf_path, agente=self.agente_user, abogado=abogado, rows=dummy_rows,
+                filename=output_path.name, identity=identity,
+                dummy=True, watermark_text=f"PAE PRUEBA - {self.agente_user.full_name}",
+            )
+
+            QMessageBox.information(
+                self, "Exportado (prueba)",
+                f"Archivo de prueba generado ({len(dummy_rows)} filas):\n{output_path}\n"
+                f"PDF: {pdf_path}\n\nUUID: {identity.uuid}\nHash: {identity.file_hash}\n\n"
+                "No se guardó ningún dato en la base de datos.",
             )
         else:
             proceed = QMessageBox.question(

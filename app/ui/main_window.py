@@ -14,6 +14,7 @@ from app.config import (
     ROLE_LABELS,
     ROLE_SUPERUSUARIO,
     ROLES_CAN_ACT_AS_AGENTE,
+    is_dummy_user,
     window_title,
 )
 from app.db.repositories.users import User
@@ -31,7 +32,11 @@ class MainWindow(QMainWindow):
     def __init__(self, user: User):
         super().__init__()
         self.user = user
-        self.setWindowTitle(window_title(f"{ROLE_LABELS[user.role]}: {user.full_name}"))
+        self.is_dummy = is_dummy_user(user)
+        title = f"{ROLE_LABELS[user.role]}: {user.full_name}"
+        if self.is_dummy:
+            title += " -- CUENTA DE PRUEBA, NADA SE GUARDA"
+        self.setWindowTitle(window_title(title))
         self.resize(1100, 720)
 
         self._background = BackgroundWidget()
@@ -150,7 +155,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.abogado.requerimientos_capture_view import RequerimientosCaptureView
 
-            widget = RequerimientosCaptureView(self.user)
+            widget = RequerimientosCaptureView(self.user, simulate=self.is_dummy)
             self.tabs.addTab(widget, "Formato de Requerimientos (Abogado)")
             self._formato_widgets["requerimientos"] = widget
         self.tabs.setCurrentWidget(widget)
@@ -160,7 +165,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
 
-            widget = RequerimientosGenerarView(self.user)
+            widget = RequerimientosGenerarView(self.user, dummy=self.is_dummy)
             self.tabs.addTab(widget, TAB_GENERAR_REQUERIMIENTO)
             self._formato_widgets["generar_formato"] = widget
         self.tabs.setCurrentWidget(widget)
@@ -170,7 +175,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.agente.requerimientos_revision_view import RequerimientosRevisionView
 
-            widget = RequerimientosRevisionView(self.user)
+            widget = RequerimientosRevisionView(self.user, simulate=self.is_dummy)
             widget.archivo_cambiado.connect(
                 lambda filename, w=widget: self._on_revision_filename_changed(w, filename)
             )
@@ -193,7 +198,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.agente.mandamientos_generar_view import MandamientosGenerarView
 
-            widget = MandamientosGenerarView(self.user)
+            widget = MandamientosGenerarView(self.user, dummy=self.is_dummy)
             self.tabs.addTab(widget, TAB_GENERAR_MANDAMIENTO)
             self._formato_widgets["generar_mandamiento"] = widget
         self.tabs.setCurrentWidget(widget)
@@ -203,7 +208,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.agente.mandamientos_revision_view import MandamientosRevisionView
 
-            widget = MandamientosRevisionView(self.user)
+            widget = MandamientosRevisionView(self.user, simulate=self.is_dummy)
             widget.archivo_cambiado.connect(
                 lambda filename, w=widget: self._on_revision_filename_changed(w, filename)
             )
@@ -218,7 +223,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.abogado.mandamientos_capture_view import MandamientosCaptureView
 
-            widget = MandamientosCaptureView(self.user)
+            widget = MandamientosCaptureView(self.user, simulate=self.is_dummy)
             self.tabs.addTab(widget, "Formato de Mandamientos (Abogado)")
             self._formato_widgets["mandamientos"] = widget
         self.tabs.setCurrentWidget(widget)
@@ -279,7 +284,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.admin.color_settings_view import ColorSettingsView
 
-            widget = ColorSettingsView(self.user, allow_pdf=False)
+            widget = ColorSettingsView(self.user, allow_pdf=False, allow_save=not self.is_dummy)
             self.tabs.addTab(widget, "Colores")
             self._otros_widgets["colores"] = widget
         self.tabs.setCurrentWidget(widget)
