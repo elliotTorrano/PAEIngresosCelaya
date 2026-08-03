@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtWidgets import (
@@ -26,17 +24,11 @@ from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import users as users_repo
 from app.excel_io import mcdiep_format
 from app.excel_io.duplicates import find_duplicate_filenames
-from app.excel_io.requerimientos_export import export_for_abogado
+from app.excel_io.requerimientos_export import build_agente_envelope
 from app.excel_io.requerimientos_import import parse_requerimientos_file
+from app.pdf_io import requerimientos_pdf
 from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
 from app.utils.paths import exports_dir
-
-_INVALID_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')
-
-
-def _sanitize_filename(text: str) -> str:
-    """Reemplaza caracteres inválidos en nombres de archivo de Windows por '_'."""
-    return _INVALID_FILENAME_CHARS.sub("_", text).strip()
 
 
 class RequerimientosGenerarView(QWidget):
@@ -221,8 +213,19 @@ class RequerimientosGenerarView(QWidget):
             if confirm_dialog.exec() != QDialog.DialogCode.Accepted:
                 return
 
-            fecha = datetime.now().strftime("%d_%m_%Y")
-            filename = f"LISTA DEL {fecha} {_sanitize_filename(abogado.full_name)}{mcdiep_format.EXTENSION}"
+            document_uuid = requerimientos_pdf.new_document_uuid()
+            envelope = build_agente_envelope(
+                self._rows, agente=self.agente_user, abogado=abogado,
+                private_key=confirm_dialog.private_key, document_uuid=document_uuid,
+            )
+            mcdiep_bytes = mcdiep_format.envelope_bytes(envelope)
+            identity = requerimientos_pdf.compute_identity(
+                mcdiep_bytes, document_uuid=document_uuid, private_key=confirm_dialog.private_key,
+            )
+            filename = requerimientos_pdf.suggested_filename(
+                agente_nombre=self.agente_user.full_name, abogado_nombre=abogado.full_name,
+                identity=identity, extension=mcdiep_format.EXTENSION,
+            )
             folder = QFileDialog.getExistingDirectory(
                 self, "Elegir carpeta para guardar el archivo exportado", str(exports_dir())
             )
@@ -245,15 +248,21 @@ class RequerimientosGenerarView(QWidget):
                 agente_id=self.agente_user.id, filenames=self._source_filenames, batch_id=batch_id
             )
 
-            export_for_abogado(
-                self._rows, output_path,
-                agente=self.agente_user, abogado=abogado, private_key=confirm_dialog.private_key,
+            output_path.write_bytes(mcdiep_bytes)
+            req_repo.set_batch_export_path(
+                batch_id, agente_path=str(output_path),
+                agente_uuid=identity.uuid, agente_hash=identity.file_hash,
             )
-            req_repo.set_batch_export_path(batch_id, agente_path=str(output_path))
+            pdf_path = output_path.with_suffix(".pdf")
+            requerimientos_pdf.export_agente_pdf(
+                pdf_path, agente=self.agente_user, abogado=abogado, rows=self._rows,
+                filename=output_path.name, identity=identity,
+            )
 
             QMessageBox.information(
                 self, "Exportado",
-                f"Se exportaron y firmaron {len(self._rows)} filas para {abogado.full_name}:\n{output_path}",
+                f"Se exportaron y firmaron {len(self._rows)} filas para {abogado.full_name}:\n{output_path}\n"
+                f"PDF: {pdf_path}\n\nUUID: {identity.uuid}\nHash: {identity.file_hash}",
             )
 
         self._rows = []

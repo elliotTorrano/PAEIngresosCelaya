@@ -164,7 +164,12 @@ def test_reusing_same_filename_in_a_new_batch_is_not_blocked(qapp, db, tmp_path)
     assert rows[1]["batch_id"] is None  # la segunda todavía no se exporta
 
 
-def test_export_filename_follows_lista_del_convention(qapp, db, tmp_path):
+def test_export_filename_follows_agente_abogado_uuid_hash_convention(qapp, db, tmp_path):
+    """El nombre sugerido es AGENTE_ABOGADO_{8 del UUID}_{10 del hash} fecha
+    (ver app/pdf_io/requerimientos_pdf.py::suggested_filename) -- no se puede
+    predecir el UUID/hash exactos (son aleatorios por exportación), así que
+    sólo se verifica el patrón: nombres de Agente/Abogado + fecha, con un
+    solo .mcdiep y su .pdf generados."""
     from app.utils.paths import exports_dir
 
     agente, private_key = _make_agente_abogado()
@@ -191,8 +196,9 @@ def test_export_filename_follows_lista_del_convention(qapp, db, tmp_path):
         view._on_export()
 
     fecha = datetime.now().strftime("%d_%m_%Y")
-    expected = exports_dir() / f"LISTA DEL {fecha} Abogado Uno.mcdiep"
-    assert expected.exists()
+    mcdiep_matches = list(exports_dir().glob(f"Agente Uno_Abogado Uno_*_* {fecha}.mcdiep"))
+    assert len(mcdiep_matches) == 1
+    assert mcdiep_matches[0].with_suffix(".pdf").exists()
 
 
 def test_export_without_certificate_is_blocked(qapp, db, tmp_path):
@@ -359,7 +365,7 @@ def test_export_succeeds_with_correct_password_and_certificate(qapp, db, tmp_pat
     ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.information"):
         view._on_export()
 
-    matches = list(dest_folder.glob("LISTA DEL *.mcdiep"))
+    matches = list(dest_folder.glob("*.mcdiep"))
     assert len(matches) == 1
 
 
@@ -499,15 +505,15 @@ def test_export_confirmation_shows_file_list(qapp, db, tmp_path):
 # --- Confirmar sobrescritura si el archivo ya existe ----------------------------------
 
 def test_export_overwrite_confirmation_declined_keeps_existing_file(qapp, db, tmp_path):
+    """El nombre ya no es predecible por sí solo (incluye UUID/hash
+    aleatorios) -- se fija new_document_uuid a un valor conocido para que dos
+    exportaciones con las mismas filas produzcan el mismo nombre y así poder
+    forzar la colisión que dispara la confirmación de sobrescritura."""
     agente, private_key = _make_agente_abogado()
     path = tmp_path / "lote.xlsx"
     _write_valid_file(path)
     dest_folder = tmp_path / "destino"
     dest_folder.mkdir()
-
-    fecha = datetime.now().strftime("%d_%m_%Y")
-    existing = dest_folder / f"LISTA DEL {fecha} Abogado Uno.mcdiep"
-    existing.write_bytes(b"contenido previo")
 
     view = RequerimientosGenerarView(agente)
     with patch(
@@ -517,6 +523,33 @@ def test_export_overwrite_confirmation_declined_keeps_existing_file(qapp, db, tm
         view._on_select_files()
 
     with patch(
+        "app.ui.agente.requerimientos_generar_view.requerimientos_pdf.new_document_uuid",
+        return_value="11111111-1111-1111-1111-111111111111",
+    ), patch(
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
+        return_value=QMessageBox.StandardButton.Yes,
+    ), patch(
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog",
+        return_value=_mock_confirm_dialog(private_key),
+    ), patch(
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory",
+        return_value=str(dest_folder),
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.information"):
+        view._on_export()  # primera exportación: crea el archivo con el UUID fijo
+
+    existing = next(dest_folder.glob("*.mcdiep"))
+    existing_bytes = existing.read_bytes()
+
+    with patch(
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
+        return_value=([str(path)], ""),
+    ):
+        view._on_select_files()  # vuelve a cargar el mismo archivo para un segundo intento
+
+    with patch(
+        "app.ui.agente.requerimientos_generar_view.requerimientos_pdf.new_document_uuid",
+        return_value="11111111-1111-1111-1111-111111111111",
+    ), patch(
         "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         side_effect=[QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No],
     ), patch(
@@ -526,12 +559,12 @@ def test_export_overwrite_confirmation_declined_keeps_existing_file(qapp, db, tm
         "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory",
         return_value=str(dest_folder),
     ):
-        view._on_export()
+        view._on_export()  # segunda: mismo nombre -> pregunta sobrescribir -> No
 
-    assert existing.read_bytes() == b"contenido previo"
+    assert existing.read_bytes() == existing_bytes
     conn = get_connection()
-    assert conn.execute("SELECT COUNT(*) AS n FROM requerimiento_batches").fetchone()["n"] == 0
-    assert view._rows  # no se limpió: no se exportó nada
+    assert conn.execute("SELECT COUNT(*) AS n FROM requerimiento_batches").fetchone()["n"] == 1
+    assert view._rows  # no se limpió: la segunda no se exportó
 
 
 def test_export_overwrite_confirmed_replaces_file(qapp, db, tmp_path):
@@ -541,10 +574,6 @@ def test_export_overwrite_confirmed_replaces_file(qapp, db, tmp_path):
     dest_folder = tmp_path / "destino"
     dest_folder.mkdir()
 
-    fecha = datetime.now().strftime("%d_%m_%Y")
-    existing = dest_folder / f"LISTA DEL {fecha} Abogado Uno.mcdiep"
-    existing.write_bytes(b"contenido previo")
-
     view = RequerimientosGenerarView(agente)
     with patch(
         "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
@@ -553,6 +582,33 @@ def test_export_overwrite_confirmed_replaces_file(qapp, db, tmp_path):
         view._on_select_files()
 
     with patch(
+        "app.ui.agente.requerimientos_generar_view.requerimientos_pdf.new_document_uuid",
+        return_value="22222222-2222-2222-2222-222222222222",
+    ), patch(
+        "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
+        return_value=QMessageBox.StandardButton.Yes,
+    ), patch(
+        "app.ui.agente.requerimientos_generar_view.CertificateConfirmDialog",
+        return_value=_mock_confirm_dialog(private_key),
+    ), patch(
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getExistingDirectory",
+        return_value=str(dest_folder),
+    ), patch("app.ui.agente.requerimientos_generar_view.QMessageBox.information"):
+        view._on_export()
+
+    existing = next(dest_folder.glob("*.mcdiep"))
+    existing.write_bytes(b"contenido previo")  # simula el archivo ya entregado
+
+    with patch(
+        "app.ui.agente.requerimientos_generar_view.QFileDialog.getOpenFileNames",
+        return_value=([str(path)], ""),
+    ):
+        view._on_select_files()
+
+    with patch(
+        "app.ui.agente.requerimientos_generar_view.requerimientos_pdf.new_document_uuid",
+        return_value="22222222-2222-2222-2222-222222222222",
+    ), patch(
         "app.ui.agente.requerimientos_generar_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.Yes,
     ), patch(
@@ -566,7 +622,7 @@ def test_export_overwrite_confirmed_replaces_file(qapp, db, tmp_path):
 
     assert existing.read_bytes() != b"contenido previo"
     conn = get_connection()
-    assert conn.execute("SELECT COUNT(*) AS n FROM requerimiento_batches").fetchone()["n"] == 1
+    assert conn.execute("SELECT COUNT(*) AS n FROM requerimiento_batches").fetchone()["n"] == 2
 
 
 # --- Columnas redimensionables ---------------------------------------------------------

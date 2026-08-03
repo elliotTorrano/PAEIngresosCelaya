@@ -119,6 +119,13 @@ class RequerimientosRevisionView(QWidget):
         self.filename_label.setWordWrap(True)
         layout.addWidget(self.filename_label)
 
+        # Identidad del documento importado (UUID + hash embebidos en el
+        # .mcdiep que exportó el Abogado) -- para comparar contra lo que
+        # muestra el PDF físico que acompaña a ese mismo archivo.
+        self.identity_label = QLabel()
+        self.identity_label.setWordWrap(True)
+        layout.addWidget(self.identity_label)
+
         search_row = QHBoxLayout()
         search_row.addWidget(QLabel("Buscar por:"))
         self.revision_search_field_combo = QComboBox()
@@ -182,12 +189,22 @@ class RequerimientosRevisionView(QWidget):
         filename = rows[0].source_filename if rows else None
         self.filename_label.setText(f"Archivo en revisión: {filename}" if filename else SIN_ARCHIVO_TEXT)
         self.archivo_cambiado.emit(filename or "")
+
+        imp = revisiones_repo.get_revision_import(revision_import_id)
+        if imp is not None and imp.imported_uuid:
+            self.identity_label.setText(
+                f"Documento recibido del Abogado — UUID: {imp.imported_uuid}  Hash: {imp.imported_hash}"
+            )
+        else:
+            self.identity_label.setText("")
+
         self._refresh_revision_table(rows)
 
     def _on_clear(self) -> None:
         self.available_list.clear()
         self._current_import_id = None
         self.filename_label.setText(SIN_ARCHIVO_TEXT)
+        self.identity_label.setText("")
         self.archivo_cambiado.emit("")
         self._refresh_revision_table([])
 
@@ -207,7 +224,7 @@ class RequerimientosRevisionView(QWidget):
             return
 
         try:
-            rows = parse_abogado_export_file(Path(file_path))
+            result = parse_abogado_export_file(Path(file_path))
         except McdiepVerificationError as exc:
             QMessageBox.critical(self, "No se pudo abrir el archivo", str(exc))
             return
@@ -215,7 +232,7 @@ class RequerimientosRevisionView(QWidget):
             QMessageBox.critical(self, "Error al leer el archivo", str(exc))
             return
 
-        if not rows:
+        if not result.rows:
             QMessageBox.warning(self, "Archivo vacío", "No se encontraron filas de datos en el archivo.")
             return
 
@@ -227,11 +244,12 @@ class RequerimientosRevisionView(QWidget):
         revision_import_id = revisiones_repo.create_revision_import(
             agente_id=self.agente_user.id, source_filename=filename,
             abogado_nombre=abogado_nombre, abogado_id=abogado_id,
+            imported_uuid=result.document_uuid, imported_hash=result.file_hash,
         )
         revisiones_repo.add_revision_rows(
             agente_id=self.agente_user.id, revision_import_id=revision_import_id,
             source_filename=filename, abogado_nombre=abogado_nombre, abogado_id=abogado_id,
-            rows=rows,
+            rows=result.rows,
         )
 
         self.estado_combo.setCurrentIndex(self.estado_combo.findData(DOC_STATE_PENDIENTE))
@@ -242,7 +260,11 @@ class RequerimientosRevisionView(QWidget):
                 self.available_list.setCurrentRow(row)
                 break
 
-        QMessageBox.information(self, "Importado", f"Se importaron {len(rows)} filas para revisión.")
+        QMessageBox.information(
+            self, "Importado",
+            f"Se importaron {len(result.rows)} filas para revisión.\n\n"
+            f"UUID: {result.document_uuid}\nHash: {result.file_hash}",
+        )
 
     # --- Tabla de revisión -----------------------------------------------------------
     def _refresh_revision_table(self, rows: list[revisiones_repo.RevisionRow]) -> None:

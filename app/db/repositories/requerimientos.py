@@ -236,7 +236,15 @@ def set_batch_finalizado(batch_id: int, finalizado: bool) -> None:
     conn.commit()
 
 
-def set_batch_export_path(batch_id: int, *, agente_path: str | None = None, abogado_path: str | None = None) -> None:
+def set_batch_export_path(
+    batch_id: int, *, agente_path: str | None = None, abogado_path: str | None = None,
+    agente_uuid: str | None = None, agente_hash: str | None = None,
+    abogado_uuid: str | None = None, abogado_hash: str | None = None,
+) -> None:
+    """El UUID/hash del lado del Agente se llena tanto al exportar (en la
+    máquina del Agente) como al importar (en la máquina del Abogado, leyendo
+    lo que trae el .mcdiep recibido) -- por eso van separados de `*_path`,
+    que sólo tiene sentido del lado que efectivamente escribió el archivo."""
     conn = get_connection()
     if agente_path is not None:
         conn.execute(
@@ -247,5 +255,21 @@ def set_batch_export_path(batch_id: int, *, agente_path: str | None = None, abog
         conn.execute(
             "UPDATE requerimiento_batches SET exported_abogado_path = ?, updated_at = datetime('now') WHERE id = ?",
             (abogado_path, batch_id),
+        )
+    if agente_uuid is not None or agente_hash is not None:
+        conn.execute(
+            "UPDATE requerimiento_batches SET "
+            "agente_export_uuid = COALESCE(?, agente_export_uuid), "
+            "agente_export_hash = COALESCE(?, agente_export_hash), "
+            "updated_at = datetime('now') WHERE id = ?",
+            (agente_uuid, agente_hash, batch_id),
+        )
+    if abogado_uuid is not None or abogado_hash is not None:
+        conn.execute(
+            "UPDATE requerimiento_batches SET "
+            "abogado_export_uuid = COALESCE(?, abogado_export_uuid), "
+            "abogado_export_hash = COALESCE(?, abogado_export_hash), "
+            "updated_at = datetime('now') WHERE id = ?",
+            (abogado_uuid, abogado_hash, batch_id),
         )
     conn.commit()

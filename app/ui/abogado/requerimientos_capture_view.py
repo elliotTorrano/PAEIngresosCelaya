@@ -8,7 +8,6 @@ notificación de ese citatorio (dos eventos distintos).
 
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QDate, QTimer
@@ -32,12 +31,18 @@ from PySide6.QtWidgets import (
 )
 
 from app.auth.recovery import open_email_client
-from app.config import BATCH_STATUS_EXPORTADO, QUIEN_RECIBE_EN_PUERTA, QUIEN_RECIBE_NOMBRE
+from app.config import (
+    BATCH_STATUS_EXPORTADO,
+    QUIEN_RECIBE_EN_PUERTA,
+    QUIEN_RECIBE_HOJA_CAMPO,
+    QUIEN_RECIBE_NOMBRE,
+)
 from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import users as users_repo
 from app.excel_io import mcdiep_format
-from app.excel_io.requerimientos_export import export_captured
+from app.excel_io.requerimientos_export import build_abogado_envelope
 from app.excel_io.requerimientos_import import McdiepVerificationError, parse_agente_export_file
+from app.pdf_io import requerimientos_pdf
 from app.utils.dates import format_local_datetime
 from app.utils.paths import exports_dir
 
@@ -153,6 +158,22 @@ class RequerimientosCaptureView(QWidget):
         self.available_list.setMaximumHeight(140)
         layout.addWidget(self.available_list)
 
+        # Contadores del lote abierto: el "llenado" se mide únicamente por la
+        # columna QUIÉN RECIBE (notificación) -- no exige el citatorio también,
+        # a diferencia de is_captured usado por "Resaltar fila faltante".
+        counters_row = QHBoxLayout()
+        self.counters_label = QLabel()
+        counters_row.addWidget(self.counters_label)
+        counters_row.addStretch()
+        layout.addLayout(counters_row)
+
+        # Identidad del documento recibido del Agente (UUID + hash embebidos
+        # en el .mcdiep importado) -- para comparar contra lo que muestra el
+        # PDF físico que acompaña a ese mismo archivo.
+        self.identity_label = QLabel()
+        self.identity_label.setWordWrap(True)
+        layout.addWidget(self.identity_label)
+
         self.table = QTableWidget(0, len(HEADERS))
         self.table.setHorizontalHeaderLabels(HEADERS)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
@@ -161,6 +182,7 @@ class RequerimientosCaptureView(QWidget):
         layout.addWidget(self.table)
 
         self._refresh_available_list()
+        self._update_counters()
 
     # --- Lotes -------------------------------------------------------------------
     def _refresh_available_list(self) -> None:
@@ -195,6 +217,7 @@ class RequerimientosCaptureView(QWidget):
         self._current_batch_finalizado = False
         self.finalize_btn.setVisible(True)
         self.edit_btn.setVisible(False)
+        self._update_identity_label(None)
         self._refresh_table()
 
     def _load_batch(self, batch_id: int) -> None:
@@ -204,7 +227,17 @@ class RequerimientosCaptureView(QWidget):
         self._current_batch_finalizado = bool(batch["finalizado"]) if batch else False
         self.finalize_btn.setVisible(not self._current_batch_finalizado)
         self.edit_btn.setVisible(self._current_batch_finalizado)
+        self._update_identity_label(batch)
         self._refresh_table()
+
+    def _update_identity_label(self, batch) -> None:
+        if batch is None or not batch["agente_export_uuid"]:
+            self.identity_label.setText("")
+            return
+        self.identity_label.setText(
+            f"Documento recibido del Agente — UUID: {batch['agente_export_uuid']}  "
+            f"Hash: {batch['agente_export_hash']}"
+        )
 
     # --- Importar ------------------------------------------------------------------
     def _on_import(self) -> None:
@@ -226,7 +259,7 @@ class RequerimientosCaptureView(QWidget):
         # forma verificable: sólo se abre si la firma es válida y el archivo
         # fue firmado específicamente para esta cuenta de Abogado.
         try:
-            rows, agente = parse_agente_export_file(Path(file_path), abogado=self.abogado_user)
+            result = parse_agente_export_file(Path(file_path), abogado=self.abogado_user)
         except McdiepVerificationError as exc:
             QMessageBox.critical(self, "No se pudo abrir el archivo", str(exc))
             return
@@ -234,15 +267,19 @@ class RequerimientosCaptureView(QWidget):
             QMessageBox.critical(self, "Error al leer el archivo", str(exc))
             return
 
-        if not rows:
+        if not result.rows:
             QMessageBox.warning(self, "Archivo vacío", "No se encontraron filas de datos en el archivo.")
             return
 
+        agente = result.agente
         batch_id = req_repo.create_batch(abogado_id=self.abogado_user.id, agente_id=agente.id)
-        req_repo.add_rows(batch_id, rows)
+        req_repo.add_rows(batch_id, result.rows)
         req_repo.record_imported_file(
             original_filename=Path(file_path).name, agente_id=agente.id, abogado_id=self.abogado_user.id,
-            batch_id=batch_id, row_count=len(rows),
+            batch_id=batch_id, row_count=len(result.rows),
+        )
+        req_repo.set_batch_export_path(
+            batch_id, agente_uuid=result.document_uuid, agente_hash=result.file_hash,
         )
         self.tipo_combo.setCurrentIndex(self.tipo_combo.findData(DOC_TYPE_PENDIENTE))
         self._refresh_available_list()
@@ -253,12 +290,23 @@ class RequerimientosCaptureView(QWidget):
                 break
         QMessageBox.information(
             self, "Importado",
-            f"Se importaron {len(rows)} filas al lote #{batch_id}.\n\n"
-            f"Firmado por: {agente.full_name} ({agente.username}).",
+            f"Se importaron {len(result.rows)} filas al lote #{batch_id}.\n\n"
+            f"Firmado por: {agente.full_name} ({agente.username}).\n\n"
+            f"UUID: {result.document_uuid}\nHash: {result.file_hash}",
         )
 
     # --- Tabla de captura ------------------------------------------------------------
+    def _update_counters(self) -> None:
+        total = len(self._rows)
+        llenados = sum(1 for row in self._rows if row.quien_recibe)
+        faltan = total - llenados
+        self.counters_label.setText(
+            f"Total de la lista: {total}    |    Total de llenados: {llenados}    |    "
+            f"Faltan por llenarse: {faltan}"
+        )
+
     def _refresh_table(self) -> None:
+        self._update_counters()
         self.table.setUpdatesEnabled(False)
         try:
             self.table.setRowCount(len(self._rows))
@@ -302,6 +350,7 @@ class RequerimientosCaptureView(QWidget):
         quien_combo.addItem("", "")
         quien_combo.addItem(QUIEN_RECIBE_EN_PUERTA, QUIEN_RECIBE_EN_PUERTA)
         quien_combo.addItem(QUIEN_RECIBE_NOMBRE, QUIEN_RECIBE_NOMBRE)
+        quien_combo.addItem(QUIEN_RECIBE_HOJA_CAMPO, QUIEN_RECIBE_HOJA_CAMPO)
         if quien_value:
             quien_combo.setCurrentIndex(quien_combo.findData(quien_value))
         quien_combo.setEnabled(not self._current_batch_finalizado)
@@ -368,6 +417,7 @@ class RequerimientosCaptureView(QWidget):
                 row.quien_recibe = quien_recibe
                 row.quien_recibe_nombre = quien_recibe_nombre
                 break
+        self._update_counters()
 
     def _read_capture_trio(
         self, table_row: int, *, date_col: int, combo_col: int, name_col: int
@@ -535,8 +585,17 @@ class RequerimientosCaptureView(QWidget):
         if choice == "cancel":
             return
 
-        fecha = datetime.now().strftime("%d_%m_%Y")
-        filename = f"requerimientos_capturado_lote{self._current_batch_id} ENTREGA {fecha}{mcdiep_format.EXTENSION}"
+        batch = req_repo.get_batch(self._current_batch_id)
+        agente = users_repo.get_by_id(batch["agente_id"])
+
+        document_uuid = requerimientos_pdf.new_document_uuid()
+        envelope = build_abogado_envelope(rows_to_export, document_uuid=document_uuid)
+        mcdiep_bytes = mcdiep_format.envelope_bytes(envelope)
+        identity = requerimientos_pdf.compute_identity(mcdiep_bytes, document_uuid=document_uuid)
+        filename = requerimientos_pdf.suggested_filename(
+            agente_nombre=agente.full_name, abogado_nombre=self.abogado_user.full_name,
+            identity=identity, extension=mcdiep_format.EXTENSION,
+        )
         folder = QFileDialog.getExistingDirectory(
             self, "Elegir carpeta para guardar el archivo exportado", str(exports_dir())
         )
@@ -553,9 +612,17 @@ class RequerimientosCaptureView(QWidget):
             if overwrite != QMessageBox.StandardButton.Yes:
                 return
 
-        export_captured(rows_to_export, output_path)
-        req_repo.set_batch_export_path(self._current_batch_id, abogado_path=str(output_path))
+        output_path.write_bytes(mcdiep_bytes)
+        req_repo.set_batch_export_path(
+            self._current_batch_id, abogado_path=str(output_path),
+            abogado_uuid=identity.uuid, abogado_hash=identity.file_hash,
+        )
         req_repo.set_batch_status(self._current_batch_id, BATCH_STATUS_EXPORTADO)
+        pdf_path = output_path.with_suffix(".pdf")
+        requerimientos_pdf.export_abogado_pdf(
+            pdf_path, agente=agente, abogado=self.abogado_user, rows=rows_to_export,
+            filename=output_path.name, identity=identity,
+        )
 
         # Los datos ya exportados quedan bloqueados de inmediato -- igual que
         # "Finalizar captura" -- para que no se editen por accidente después
@@ -567,11 +634,10 @@ class RequerimientosCaptureView(QWidget):
         self._refresh_table()
         self._refresh_available_list()
 
+        identity_note = f"\nPDF: {pdf_path}\n\nUUID: {identity.uuid}\nHash: {identity.file_hash}"
         locked_note = "\n\nEl lote quedó bloqueado; use 'Editar captura' para modificarlo."
         if choice == "email":
-            batch = req_repo.get_batch(self._current_batch_id)
-            agente = users_repo.get_by_id(batch["agente_id"]) if batch else None
-            if agente is not None and agente.email:
+            if agente.email:
                 open_email_client(
                     to_email=agente.email,
                     subject="Entrega de Requerimientos capturados",
@@ -579,13 +645,16 @@ class RequerimientosCaptureView(QWidget):
                     attachment_path=output_path,
                 )
                 QMessageBox.information(
-                    self, "Exportado", f"Archivo exportado y correo abierto:\n{output_path}{locked_note}"
+                    self, "Exportado",
+                    f"Archivo exportado y correo abierto:\n{output_path}{identity_note}{locked_note}",
                 )
             else:
                 QMessageBox.warning(
                     self, "Sin correo del Agente",
                     "El archivo se exportó, pero el Agente del PAE de este lote no tiene correo "
-                    f"registrado, así que no se pudo abrir el correo:\n{output_path}{locked_note}",
+                    f"registrado, así que no se pudo abrir el correo:\n{output_path}{identity_note}{locked_note}",
                 )
         else:
-            QMessageBox.information(self, "Exportado", f"Archivo exportado:\n{output_path}{locked_note}")
+            QMessageBox.information(
+                self, "Exportado", f"Archivo exportado:\n{output_path}{identity_note}{locked_note}"
+            )

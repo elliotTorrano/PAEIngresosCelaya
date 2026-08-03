@@ -346,6 +346,127 @@ def test_migration_v8_creates_revision_imports_and_backfills_existing_rows(tmp_p
         connection_module._connection = None
 
 
+def test_migration_v10_adds_identity_columns_and_allows_hoja_de_campo(tmp_path, monkeypatch):
+    db_file = tmp_path / "v9.db"
+    monkeypatch.setattr(connection_module, "db_path", lambda: db_file)
+    connection_module._connection = None
+
+    # Simula una base v9: requerimiento_batches/requerimiento_rows sin las
+    # columnas de identidad, y con el CHECK viejo (sólo EN PUERTA/NOMBRE,
+    # sin HOJA DE CAMPO) -- así como quedaron instalaciones reales antes de
+    # esta versión.
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+    conn.execute("INSERT INTO schema_version (version) VALUES (9)")
+    conn.execute(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL, full_name TEXT NOT NULL, email TEXT, auth_type TEXT NOT NULL,
+            password_hash TEXT, password_salt TEXT, cert_public_pem TEXT, cert_serial TEXT,
+            must_change_password INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO users (id, username, role, full_name, auth_type) VALUES (1, 'agente1', 'AGENTE_PAE', 'Agente Uno', 'CERTIFICADO')"
+    )
+    conn.execute(
+        "INSERT INTO users (id, username, role, full_name, auth_type, password_hash, password_salt) "
+        "VALUES (2, 'abogado1', 'ABOGADO', 'Abogado Uno', 'PASSWORD', 'x', 'y')"
+    )
+    conn.execute(
+        """
+        CREATE TABLE requerimiento_batches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            abogado_id INTEGER NOT NULL REFERENCES users(id),
+            agente_id INTEGER NOT NULL REFERENCES users(id),
+            status TEXT NOT NULL DEFAULT 'PENDIENTE_ABOGADO',
+            exported_agente_path TEXT, exported_abogado_path TEXT,
+            finalizado INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE requerimiento_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_id INTEGER NOT NULL REFERENCES requerimiento_batches(id),
+            folio TEXT, cta_predial TEXT, contribuyente TEXT, domicilio TEXT,
+            fecha_citatorio TEXT,
+            recibe_citatorio TEXT CHECK (recibe_citatorio IN ('EN PUERTA', 'NOMBRE')),
+            recibe_citatorio_nombre TEXT,
+            fecha_notificacion TEXT,
+            quien_recibe TEXT CHECK (quien_recibe IN ('EN PUERTA', 'NOMBRE')),
+            quien_recibe_nombre TEXT,
+            captured_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE revision_imports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, agente_id INTEGER NOT NULL,
+            source_filename TEXT NOT NULL, abogado_nombre TEXT, abogado_id INTEGER,
+            status TEXT NOT NULL DEFAULT 'EN_REVISION', status_changed_at TEXT,
+            imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO requerimiento_batches (id, abogado_id, agente_id) VALUES (1, 2, 1)"
+    )
+    conn.execute(
+        "INSERT INTO requerimiento_rows (batch_id, folio, cta_predial, contribuyente, domicilio, "
+        "recibe_citatorio, quien_recibe) VALUES (1, 'F-001', 'C-001', 'Fulano', 'Calle 1', 'EN PUERTA', 'NOMBRE')"
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        ensure_schema()
+
+        conn = connection_module.get_connection()
+
+        # La fila que ya existía se preservó tal cual a través de la
+        # reconstrucción de la tabla.
+        row = conn.execute("SELECT * FROM requerimiento_rows WHERE batch_id = 1").fetchone()
+        assert row["folio"] == "F-001"
+        assert row["recibe_citatorio"] == "EN PUERTA"
+
+        # El CHECK viejo ya no bloquea HOJA DE CAMPO.
+        conn.execute(
+            "INSERT INTO requerimiento_rows (batch_id, folio, recibe_citatorio, quien_recibe) "
+            "VALUES (1, 'F-002', 'HOJA DE CAMPO', 'HOJA DE CAMPO')"
+        )
+        conn.commit()
+
+        batches_columns = [r["name"] for r in conn.execute("PRAGMA table_info(requerimiento_batches)")]
+        for col in ("agente_export_uuid", "agente_export_hash", "abogado_export_uuid", "abogado_export_hash"):
+            assert col in batches_columns
+
+        revision_columns = [r["name"] for r in conn.execute("PRAGMA table_info(revision_imports)")]
+        assert "imported_uuid" in revision_columns
+        assert "imported_hash" in revision_columns
+
+        conn.execute(
+            "UPDATE requerimiento_batches SET agente_export_uuid = 'u', agente_export_hash = 'h' WHERE id = 1"
+        )
+        conn.commit()
+        updated = conn.execute("SELECT agente_export_uuid, agente_export_hash FROM requerimiento_batches WHERE id = 1").fetchone()
+        assert updated["agente_export_uuid"] == "u"
+        assert updated["agente_export_hash"] == "h"
+
+        version = conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+        assert version == CURRENT_VERSION
+    finally:
+        connection_module._connection = None
+
+
 def test_migration_v9_adds_status_and_recomputes_fully_reviewed_imports(tmp_path, monkeypatch):
     db_file = tmp_path / "v8.db"
     monkeypatch.setattr(connection_module, "db_path", lambda: db_file)

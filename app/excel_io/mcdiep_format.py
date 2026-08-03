@@ -45,6 +45,13 @@ class McdiepEnvelope:
     target_username: str | None  # a quién va dirigido; None si no aplica
     payload: dict
     signature: bytes | None  # None si el tipo no se firma
+    # Identificador del documento (ver app/pdf_io/requerimientos_pdf.py), el
+    # mismo que se muestra en el PDF que se genera junto a este archivo --
+    # va aquí para que quien IMPORTA el archivo (en otra máquina, sin acceso
+    # a la base de datos de quien lo exportó) pueda leerlo directamente y
+    # comparar contra el documento físico. No forma parte de lo que firma
+    # `signable_bytes` -- es sólo un identificador, no contenido a proteger.
+    document_uuid: str | None = None
 
 
 def signable_bytes(kind: str, target_username: str | None, payload: dict) -> bytes:
@@ -54,11 +61,16 @@ def signable_bytes(kind: str, target_username: str | None, payload: dict) -> byt
     return json.dumps(canonical, ensure_ascii=False, sort_keys=True).encode("utf-8")
 
 
-def write_envelope(path: Path, envelope: McdiepEnvelope) -> None:
+def envelope_bytes(envelope: McdiepEnvelope) -> bytes:
+    """Serializa el envelope a los bytes exactos del archivo .mcdiep, sin
+    escribir a disco -- para poder calcular un hash/identificador del
+    documento ANTES de decidir dónde/cómo se llama el archivo final (ver
+    app/pdf_io/requerimientos_pdf.py::compute_identity)."""
     header = {
         "kind": envelope.kind,
         "signer_username": envelope.signer_username,
         "target_username": envelope.target_username,
+        "document_uuid": envelope.document_uuid,
     }
     header_bytes = json.dumps(header, ensure_ascii=False).encode("utf-8")
     payload_bytes = gzip.compress(json.dumps(envelope.payload, ensure_ascii=False).encode("utf-8"))
@@ -69,7 +81,11 @@ def write_envelope(path: Path, envelope: McdiepEnvelope) -> None:
     out += _pack_field(header_bytes)
     out += _pack_field(signature_bytes)
     out += _pack_field(payload_bytes)
-    path.write_bytes(bytes(out))
+    return bytes(out)
+
+
+def write_envelope(path: Path, envelope: McdiepEnvelope) -> None:
+    path.write_bytes(envelope_bytes(envelope))
 
 
 def read_envelope(path: Path) -> McdiepEnvelope:
@@ -102,6 +118,7 @@ def read_envelope(path: Path) -> McdiepEnvelope:
         target_username=header.get("target_username"),
         payload=payload,
         signature=signature_bytes or None,
+        document_uuid=header.get("document_uuid"),
     )
 
 

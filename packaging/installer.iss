@@ -17,7 +17,7 @@
 ; duplicar accesos directos ni perder data\ al reinstalar).
 
 #define MyAppName "Sistema PAE"
-#define MyAppVersion "0.20.1"
+#define MyAppVersion "0.21.2"
 #define MyAppPublisher "Sistema PAE"
 #define MyAppExeName "SistemaPAE.exe"
 

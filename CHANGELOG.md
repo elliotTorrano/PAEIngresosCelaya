@@ -1,5 +1,80 @@
 # Historial de versiones — Sistema PAE
 
+## 0.21.2
+
+- **El instalador y el .exe pesan ~20 MB menos** (de ~77 MB a ~56 MB, un
+  27% menos), sin cambios de funcionalidad. Se quitó del empaquetado lo
+  que nunca se usa en el programa:
+  - `numpy` (8.4 MB): no aparece en ningún import de `app/` -- se colaba
+    porque Pillow lo detecta como dependencia opcional cuando está
+    instalado en la máquina donde se compila.
+  - Los módulos de Qt para interfaces QML/táctiles (`QtQml`, `QtQuick`,
+    `QtQuick3D`, teclado virtual en pantalla) y el lector de PDF-como-
+    imagen de Qt (`QtPdf`): el programa es 100% de escritorio con
+    `QtWidgets` clásico y teclado físico, y los PDF se generan con
+    reportlab -- nunca se abren dentro del programa. Verificado con un
+    análisis de dependencias binarias que ninguna DLL de Qt que sí se usa
+    (Core/Gui/Widgets/Network) depende de ellos.
+  - Las ~96 traducciones de Qt a otros idiomas (~1.8 MB): el programa
+    nunca instala un `QTranslator` -- todo el texto está en español,
+    directamente en el código.
+  - Verificado con una prueba de extremo a extremo en modo congelado
+    (simulando el .exe empacado) que el sello con código QR de los PDF
+    generados sigue produciéndose y decodificándose correctamente.
+
+## 0.21.1
+
+- **Corregido: "Generar Formato > Requerimiento" no hacía nada al hacer clic**
+  en la versión instalada (.exe). Causa: `reportlab` importa internamente el
+  módulo del código de barras/QR (`reportlab.graphics.barcode.code128` y
+  hermanos) de forma dinámica, no con un `import` estático visible -- el
+  análisis de PyInstaller no lo detectaba y quedaba fuera del paquete. Al
+  abrir esa pantalla (que usa el widget QR del sello del PDF), fallaba con
+  `ModuleNotFoundError`, y como el `.exe` no tiene consola, el error no se
+  veía en ningún lado -- para quien usaba el programa, simplemente "no pasaba
+  nada". Ya se declara explícitamente en `packaging/pae.spec` para que se
+  incluya siempre.
+- **Nuevo manejador global de errores**: cualquier error inesperado que
+  ocurra al hacer clic en un botón o menú ahora se guarda en `data/error.log`
+  y se muestra un aviso en pantalla con el detalle, en vez de no hacer nada
+  visible (que fue justo lo que ocultó el bug anterior).
+
+## 0.21.0
+
+- **Contadores en la captura del Abogado**: "Total de la lista", "Total de
+  llenados" y "Faltan por llenarse" (medidos por la columna QUIÉN RECIBE),
+  visibles arriba de la tabla y actualizados en tiempo real.
+- **Nueva opción "HOJA DE CAMPO"** en los combos Recibe citatorio y Quién
+  recibe, junto a EN PUERTA y NOMBRE.
+- **Exportación en PDF junto al .mcdiep**, en las tres exportaciones
+  (Generar Formato del Agente, captura del Abogado, y "Volver a exportar"
+  de Seguimiento): hoja horizontal pensada para imprimirse a doble cara,
+  con:
+  - Cabecera institucional (Municipio de Celaya, Tesorería, Formato,
+    Impuesto Predial, Dirección, Procedimiento, Despacho, fecha), con el
+    escudo y, sólo en la exportación del Abogado, los contadores
+    Notificado/Instructivo/Hoja de campo además del total de documentos a
+    entregar (que en la del Agente es la totalidad de las filas, y en la
+    del Abogado sólo las que ya tienen QUIÉN RECIBE lleno).
+  - Cuerpo con todas las columnas de la captura ajustadas al ancho de la
+    hoja (el texto envuelve dentro de cada celda en vez de recortar
+    columnas), repitiendo el encabezado en cada página si el lote es
+    grande.
+  - Un sello final estilo CFDI del SAT: UUID, hash SHA-256, firma digital
+    (cuando la exportación llevó certificado -- el flujo del Agente; el
+    del Abogado no, porque se autentica con contraseña), y un código QR
+    con UUID/agente/archivo/hash. Ese mismo QR chico (con UUID y hash
+    abreviados) también aparece dentro del cuadro de la cabecera en la
+    primera página, y al pie izquierdo de las páginas siguientes.
+- **UUID y hash quedan embebidos en el propio .mcdiep** y guardados en la
+  base de datos de quien exporta (para poder relacionarlos después). Al
+  importar -- ya sea el Abogado recibiendo la lista del Agente, o el
+  Agente recibiendo la captura del Abogado en "Revisar Formato" -- se
+  muestran en pantalla, para comparar visualmente que lo que se está
+  revisando en el programa concuerda con el documento físico impreso.
+- **Nuevo patrón de nombre sugerido** para los archivos exportados:
+  `AGENTE_ABOGADO_{primeros 8 del UUID}_{primeros 10 del hash} fecha`.
+
 ## 0.20.1
 
 - **Corrección: instalaciones nuevas se veían sin fondo en las ventanas del

@@ -44,6 +44,14 @@ CREATE TABLE IF NOT EXISTS requerimiento_batches (
     exported_agente_path  TEXT,
     exported_abogado_path TEXT,
     finalizado            INTEGER NOT NULL DEFAULT 0,
+    -- Identificador del documento (UUID + hash, el mismo que trae el PDF
+    -- exportado -- ver app/pdf_io/requerimientos_pdf.py). Cada máquina llena
+    -- las columnas que le tocan: al exportar, directo; al importar, leyendo
+    -- el UUID embebido en el .mcdiep y recalculando el hash de los bytes.
+    agente_export_uuid    TEXT,
+    agente_export_hash    TEXT,
+    abogado_export_uuid   TEXT,
+    abogado_export_hash   TEXT,
     created_at            TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -56,10 +64,10 @@ CREATE TABLE IF NOT EXISTS requerimiento_rows (
     contribuyente            TEXT,
     domicilio                TEXT,
     fecha_citatorio          TEXT,
-    recibe_citatorio         TEXT CHECK (recibe_citatorio IN ('EN PUERTA', 'NOMBRE')),
+    recibe_citatorio         TEXT CHECK (recibe_citatorio IN ('EN PUERTA', 'NOMBRE', 'HOJA DE CAMPO')),
     recibe_citatorio_nombre  TEXT,
     fecha_notificacion       TEXT,
-    quien_recibe             TEXT CHECK (quien_recibe IN ('EN PUERTA', 'NOMBRE')),
+    quien_recibe             TEXT CHECK (quien_recibe IN ('EN PUERTA', 'NOMBRE', 'HOJA DE CAMPO')),
     quien_recibe_nombre      TEXT,
     captured_at              TEXT
 );
@@ -76,7 +84,11 @@ CREATE TABLE IF NOT EXISTS revision_imports (
     status            TEXT NOT NULL DEFAULT 'EN_REVISION'
                       CHECK (status IN ('EN_REVISION', 'PENDIENTE_REPORTE', 'REPORTE_ENVIADO')),
     status_changed_at TEXT NOT NULL DEFAULT (datetime('now')),
-    imported_at       TEXT NOT NULL DEFAULT (datetime('now'))
+    imported_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    -- Identificador del documento importado (UUID embebido en el .mcdiep +
+    -- hash recalculado de los bytes recibidos), para comparar contra el PDF físico.
+    imported_uuid     TEXT,
+    imported_hash     TEXT
 );
 
 CREATE TABLE IF NOT EXISTS revision_rows (

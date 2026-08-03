@@ -6,7 +6,6 @@ las reemplaza."""
 
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Signal
@@ -30,7 +29,8 @@ from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import revisiones as revisiones_repo
 from app.db.repositories import users as users_repo
 from app.excel_io import mcdiep_format
-from app.excel_io.requerimientos_export import export_for_abogado
+from app.excel_io.requerimientos_export import build_agente_envelope
+from app.pdf_io import requerimientos_pdf
 from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
 from app.utils.dates import format_local_datetime
 from app.utils.paths import exports_dir
@@ -226,8 +226,27 @@ class SeguimientoView(QWidget):
         if confirm_dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
-        fecha = datetime.now().strftime("%d_%m_%Y")
-        suggested_path = exports_dir() / f"LISTA DEL {fecha} {abogado.full_name}{mcdiep_format.EXTENSION}"
+        row_dicts = [
+            {
+                "folio": row.folio, "cta_predial": row.cta_predial,
+                "contribuyente": row.contribuyente, "domicilio": row.domicilio,
+            }
+            for row in rows
+        ]
+        document_uuid = requerimientos_pdf.new_document_uuid()
+        envelope = build_agente_envelope(
+            row_dicts, agente=self.agente_user, abogado=abogado,
+            private_key=confirm_dialog.private_key, document_uuid=document_uuid,
+        )
+        mcdiep_bytes = mcdiep_format.envelope_bytes(envelope)
+        identity = requerimientos_pdf.compute_identity(
+            mcdiep_bytes, document_uuid=document_uuid, private_key=confirm_dialog.private_key,
+        )
+        suggested_name = requerimientos_pdf.suggested_filename(
+            agente_nombre=self.agente_user.full_name, abogado_nombre=abogado.full_name,
+            identity=identity, extension=mcdiep_format.EXTENSION,
+        )
+        suggested_path = exports_dir() / suggested_name
         output_path_str, _ = QFileDialog.getSaveFileName(
             self, "Guardar como", str(suggested_path), f"Sistema PAE (*{mcdiep_format.EXTENSION})",
         )
@@ -235,17 +254,20 @@ class SeguimientoView(QWidget):
             return
         output_path = Path(output_path_str)
 
-        export_for_abogado(
-            [
-                {
-                    "folio": row.folio, "cta_predial": row.cta_predial,
-                    "contribuyente": row.contribuyente, "domicilio": row.domicilio,
-                }
-                for row in rows
-            ],
-            output_path, agente=self.agente_user, abogado=abogado, private_key=confirm_dialog.private_key,
+        output_path.write_bytes(mcdiep_bytes)
+        req_repo.set_batch_export_path(
+            batch_id, agente_path=str(output_path),
+            agente_uuid=identity.uuid, agente_hash=identity.file_hash,
         )
-        req_repo.set_batch_export_path(batch_id, agente_path=str(output_path))
+        pdf_path = output_path.with_suffix(".pdf")
+        requerimientos_pdf.export_agente_pdf(
+            pdf_path, agente=self.agente_user, abogado=abogado, rows=row_dicts,
+            filename=output_path.name, identity=identity,
+        )
 
-        QMessageBox.information(self, "Exportado", f"Se volvió a exportar el documento:\n{output_path}")
+        QMessageBox.information(
+            self, "Exportado",
+            f"Se volvió a exportar el documento:\n{output_path}\nPDF: {pdf_path}\n\n"
+            f"UUID: {identity.uuid}\nHash: {identity.file_hash}",
+        )
         self._refresh_table()

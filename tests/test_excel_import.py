@@ -106,9 +106,11 @@ def test_parse_agente_export_file_reads_clean_headers(db, tmp_path):
         path, agente=agente, abogado=abogado, private_key=private_key,
     )
 
-    rows, signer = parse_agente_export_file(path, abogado=abogado)
+    result = parse_agente_export_file(path, abogado=abogado)
 
-    assert rows == [
+    assert result.rows == [
         {"folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1"}
     ]
-    assert signer.username == "agente1"
+    assert result.agente.username == "agente1"
+    assert result.document_uuid
+    assert result.file_hash

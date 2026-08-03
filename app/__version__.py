@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.20.1"
+__version__ = "0.21.2"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -194,4 +194,36 @@ VERSION_NOTES = {
               "configurado una apariencia en 'Otros > Apariencia' en esa máquina, se usa "
               "un fondo de fábrica por defecto; si el Administrador eligió una imagen o "
               "un color propio, esa elección se sigue respetando sin cambios.",
+    "0.21.0": "Contadores en la captura del Abogado (Total de la lista/Total de "
+              "llenados/Faltan por llenarse, según la columna QUIÉN RECIBE); nueva opción "
+              "'HOJA DE CAMPO' en Recibe citatorio/Quién recibe. Exportación en PDF junto "
+              "al .mcdiep en las tres exportaciones (Generar Formato, captura del Abogado, "
+              "y 'Volver a exportar' de Seguimiento): hoja horizontal con cabecera "
+              "institucional, contadores de notificación, todas las columnas ajustadas al "
+              "ancho de la página, y un sello estilo CFDI con UUID, hash SHA-256, firma "
+              "digital (cuando hay certificado) y un código QR -- en la primera página "
+              "dentro de la cabecera, en las siguientes al pie. El UUID y el hash quedan "
+              "embebidos en el propio .mcdiep y guardados en la base de datos de quien "
+              "exporta; al importar (Abogado o Agente en Revisar Formato) se muestran en "
+              "pantalla para comparar visualmente contra el PDF físico recibido. El nombre "
+              "sugerido de los archivos exportados ahora sigue el patrón "
+              "AGENTE_ABOGADO_UUID_HASH fecha.",
+    "0.21.1": "Corregido: el botón 'Generar Formato > Requerimiento' del Agente del PAE "
+              "no hacía nada al hacer clic en la versión instalada (.exe empacada) -- "
+              "reportlab importa por dentro el módulo del código QR de forma dinámica, y "
+              "el empaquetado no lo estaba incluyendo, así que fallaba en silencio al "
+              "abrir esa pantalla. Ya viene incluido. Además, cualquier error inesperado "
+              "en un clic ahora se registra en data/error.log y se avisa en pantalla, en "
+              "vez de no hacer nada visible como antes.",
+    "0.21.2": "El instalador y el .exe pesan alrededor de 20 MB menos (de ~77 a "
+              "~56 MB): se quitaron del empaquetado numpy (nunca se usa en el "
+              "programa -- se colaba como dependencia opcional de Pillow), los "
+              "componentes de Qt para pantallas QML/táctiles y teclado virtual "
+              "(el programa es de escritorio con teclado físico, sin ninguna "
+              "pantalla de ese tipo), el lector de PDF-como-imagen de Qt (los PDF "
+              "se generan con reportlab, nunca se abren dentro del programa), y "
+              "las traducciones de Qt a otros idiomas (todo el texto del programa "
+              "ya está en español, fijo en el código). Sin cambios de "
+              "funcionalidad -- verificado que el sello con QR de los PDF sigue "
+              "generándose y leyéndose igual.",
 }

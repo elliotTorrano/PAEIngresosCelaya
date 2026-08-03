@@ -17,9 +17,12 @@ def test_parse_abogado_export_file_maps_all_columns(tmp_path):
     path = tmp_path / "captura.mcdiep"
     export_captured([_make_row()], path)
 
-    rows = parse_abogado_export_file(path)
+    result = parse_abogado_export_file(path)
+    rows = result.rows
 
     assert len(rows) == 1
+    assert result.document_uuid
+    assert result.file_hash
     row = rows[0]
     assert row["folio"] == "F-001"
     assert row["cta_predial"] == "CP-001"
@@ -37,6 +40,6 @@ def test_parse_abogado_export_file_multiple_rows(tmp_path):
     path = tmp_path / "captura.mcdiep"
     export_captured([_make_row(id=1, folio="F-001"), _make_row(id=2, folio="F-002")], path)
 
-    rows = parse_abogado_export_file(path)
+    rows = parse_abogado_export_file(path).rows
     assert len(rows) == 2
     assert rows[1]["folio"] == "F-002"

@@ -10,6 +10,7 @@ de origen del padrón suelen venir en ese formato viejo.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -63,7 +64,22 @@ def parse_requerimientos_file(path: Path) -> ImportResult:
     return ImportResult(filename=path.name, rows=rows)
 
 
-def parse_agente_export_file(path: Path, *, abogado: User) -> tuple[list[dict], User]:
+@dataclass
+class AgenteImportResult:
+    rows: list[dict]
+    agente: User
+    document_uuid: str | None
+    file_hash: str
+
+
+@dataclass
+class AbogadoImportResult:
+    rows: list[dict]
+    document_uuid: str | None
+    file_hash: str
+
+
+def parse_agente_export_file(path: Path, *, abogado: User) -> AgenteImportResult:
     """Lee el archivo .mcdiep que el Agente del PAE exportó para `abogado`.
 
     Verifica, en este orden: que sea un archivo .mcdiep del tipo correcto;
@@ -73,8 +89,12 @@ def parse_agente_export_file(path: Path, *, abogado: User) -> tuple[list[dict], 
     Si cualquiera de estas verificaciones falla, no se abre -- se levanta
     McdiepVerificationError con el motivo.
 
-    Devuelve (filas, agente_que_firmó) para que quien llama pueda mostrar
-    quién firmó el archivo."""
+    Además del firmante, devuelve el UUID embebido en el archivo y el hash
+    de los bytes tal como se recibieron -- el mismo identificador que trae
+    el PDF que acompaña al .mcdiep, para comprobar visualmente que lo que se
+    está importando concuerda con el documento físico."""
+    file_bytes = path.read_bytes()
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
     envelope = mcdiep_format.read_envelope(path)
     if envelope.kind != mcdiep_format.KIND_AGENTE_TO_ABOGADO:
         raise McdiepVerificationError(
@@ -101,19 +121,28 @@ def parse_agente_export_file(path: Path, *, abogado: User) -> tuple[list[dict], 
             f"'{abogado.username}'. No se abre."
         )
 
-    return envelope.payload.get("rows", []), signer
+    return AgenteImportResult(
+        rows=envelope.payload.get("rows", []), agente=signer,
+        document_uuid=envelope.document_uuid, file_hash=file_hash,
+    )
 
 
-def parse_abogado_export_file(path: Path) -> list[dict]:
+def parse_abogado_export_file(path: Path) -> AbogadoImportResult:
     """Lee el archivo .mcdiep que el Abogado exportó con su captura, para el
     Agente del PAE. No lleva firma (el Abogado no tiene certificado); sólo se
-    verifica que sea un .mcdiep del tipo correcto."""
+    verifica que sea un .mcdiep del tipo correcto. Igual que
+    `parse_agente_export_file`, devuelve el UUID embebido y el hash de los
+    bytes recibidos."""
+    file_bytes = path.read_bytes()
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
     envelope = mcdiep_format.read_envelope(path)
     if envelope.kind != mcdiep_format.KIND_ABOGADO_TO_AGENTE:
         raise McdiepVerificationError(
             "Este archivo no es una captura de Abogado exportada por Sistema PAE."
         )
-    return envelope.payload.get("rows", [])
+    return AbogadoImportResult(
+        rows=envelope.payload.get("rows", []), document_uuid=envelope.document_uuid, file_hash=file_hash,
+    )
 
 
 def _read_all_row_values(path: Path) -> list[list]:

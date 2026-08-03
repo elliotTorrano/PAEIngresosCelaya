@@ -129,9 +129,9 @@ def test_export_only_does_not_call_email(qapp, db):
         view._on_export()
 
     mock_email.assert_not_called()
-    fecha = datetime.now().strftime("%d_%m_%Y")
-    expected = exports_dir() / f"requerimientos_capturado_lote{batch_id} ENTREGA {fecha}.mcdiep"
-    assert expected.exists()
+    matches = list(exports_dir().glob("*.mcdiep"))
+    assert len(matches) == 1
+    assert matches[0].with_suffix(".pdf").exists()
 
 
 def test_export_and_email_sends_to_agente(qapp, db):
@@ -162,15 +162,17 @@ def test_export_cancel_does_not_write_or_change_status(qapp, db):
     with patch(
         "app.ui.abogado.requerimientos_capture_view.RequerimientosCaptureView._ask_export_choice",
         return_value="cancel",
-    ), patch("app.ui.abogado.requerimientos_capture_view.export_captured") as mock_export:
+    ):
         view._on_export()
 
-    mock_export.assert_not_called()
     batch = req_repo.get_batch(batch_id)
     assert batch["status"] != "EXPORTADO"
+    assert batch["abogado_export_uuid"] is None
 
 
 def test_export_cancelled_folder_picker_does_not_write_or_change_status(qapp, db):
+    from app.utils.paths import exports_dir
+
     _, abogado, batch_id = _make_agente_abogado_with_batch()
     view = RequerimientosCaptureView(abogado)
     view._load_batch(batch_id)
@@ -180,12 +182,13 @@ def test_export_cancelled_folder_picker_does_not_write_or_change_status(qapp, db
         return_value="only",
     ), patch(
         "app.ui.abogado.requerimientos_capture_view.QFileDialog.getExistingDirectory", return_value=""
-    ), patch("app.ui.abogado.requerimientos_capture_view.export_captured") as mock_export:
+    ):
         view._on_export()
 
-    mock_export.assert_not_called()
+    assert list(exports_dir().glob("*.mcdiep")) == []
     batch = req_repo.get_batch(batch_id)
     assert batch["status"] != "EXPORTADO"
+    assert batch["abogado_export_uuid"] is None
 
 
 # --- Finalizar / editar --------------------------------------------------------------
@@ -300,9 +303,8 @@ def test_export_excludes_untouched_rows(qapp, db, tmp_path):
     ), patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.information"):
         view._on_export()
 
-    fecha = datetime.now().strftime("%d_%m_%Y")
-    output_path = exports_dir() / f"requerimientos_capturado_lote{batch_id} ENTREGA {fecha}.mcdiep"
-    exported_rows = parse_abogado_export_file(output_path)
+    output_path = next(exports_dir().glob("*.mcdiep"))
+    exported_rows = parse_abogado_export_file(output_path).rows
     assert len(exported_rows) == 1
     assert exported_rows[0]["folio"] == "F-001"
 
@@ -324,28 +326,50 @@ def test_export_warns_when_nothing_modified(qapp, db):
     view = RequerimientosCaptureView(abogado)
     view._load_batch(batch_id)
 
-    with patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.warning") as mock_warn, patch(
-        "app.ui.abogado.requerimientos_capture_view.export_captured"
-    ) as mock_export:
+    with patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.warning") as mock_warn:
         view._on_export()
 
     mock_warn.assert_called_once()
-    mock_export.assert_not_called()
+    assert req_repo.get_batch(batch_id)["abogado_export_uuid"] is None
 
 
 def test_export_overwrite_confirmation_declined_keeps_existing_file(qapp, db):
+    """El nombre ya no es predecible por sí solo (incluye UUID/hash
+    aleatorios) -- se fija new_document_uuid a un valor conocido para que dos
+    exportaciones del mismo lote produzcan el mismo nombre y así forzar la
+    colisión que dispara la confirmación de sobrescritura."""
     from app.utils.paths import exports_dir
 
     _, abogado, batch_id = _make_agente_abogado_with_batch()
-
-    fecha = datetime.now().strftime("%d_%m_%Y")
-    existing = exports_dir() / f"requerimientos_capturado_lote{batch_id} ENTREGA {fecha}.mcdiep"
-    existing.write_bytes(b"contenido previo")
 
     view = RequerimientosCaptureView(abogado)
     view._load_batch(batch_id)
 
     with patch(
+        "app.ui.abogado.requerimientos_capture_view.requerimientos_pdf.new_document_uuid",
+        return_value="33333333-3333-3333-3333-333333333333",
+    ), patch(
+        "app.ui.abogado.requerimientos_capture_view.RequerimientosCaptureView._ask_export_choice",
+        return_value="only",
+    ), patch(
+        "app.ui.abogado.requerimientos_capture_view.QFileDialog.getExistingDirectory",
+        return_value=str(exports_dir()),
+    ), patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.information"):
+        view._on_export()  # primera exportación: crea el archivo con el UUID fijo
+
+    existing = next(exports_dir().glob("*.mcdiep"))
+    existing_bytes = existing.read_bytes()
+
+    with patch(
+        "app.ui.abogado.requerimientos_capture_view.QMessageBox.warning",
+        return_value=QMessageBox.StandardButton.Yes,
+    ):
+        view._on_unlock_edit()  # el lote quedó bloqueado tras exportar; se desbloquea para reintentar
+
+    with patch(
+        "app.ui.abogado.requerimientos_capture_view.requerimientos_pdf.new_document_uuid",
+        return_value="33333333-3333-3333-3333-333333333333",
+    ), patch(
         "app.ui.abogado.requerimientos_capture_view.RequerimientosCaptureView._ask_export_choice",
         return_value="only",
     ), patch(
@@ -355,11 +379,9 @@ def test_export_overwrite_confirmation_declined_keeps_existing_file(qapp, db):
         "app.ui.abogado.requerimientos_capture_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.No,
     ):
-        view._on_export()
+        view._on_export()  # segunda: mismo nombre -> pregunta sobrescribir -> No
 
-    assert existing.read_bytes() == b"contenido previo"
-    batch = req_repo.get_batch(batch_id)
-    assert batch["status"] != "EXPORTADO"
+    assert existing.read_bytes() == existing_bytes
 
 
 # --- Bloqueo automático al exportar + advertencia al editar ---------------------------

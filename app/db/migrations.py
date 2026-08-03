@@ -8,7 +8,7 @@ from pathlib import Path
 from app.db.connection import get_connection
 
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
-CURRENT_VERSION = 9
+CURRENT_VERSION = 10
 
 # Migraciones incrementales para bases de datos creadas con una versión anterior
 # del esquema. schema.sql ya crea las tablas nuevas "desde cero" con todo esto
@@ -101,6 +101,49 @@ _MIGRATIONS: dict[int, str | list[str]] = {
                 HAVING COUNT(rr.id) > 0
                    AND SUM(CASE WHEN rr.procede IS NOT NULL THEN 1 ELSE 0 END) = COUNT(rr.id)
             )""",
+    ],
+    10: [
+        # UUID + hash del documento (mismo identificador que trae el PDF
+        # exportado -- ver app/pdf_io/requerimientos_pdf.py). En
+        # requerimiento_batches se guardan de los DOS lados del intercambio:
+        # lo que el Agente exportó/el Abogado importó, y lo que el Abogado
+        # exportó de vuelta -- cada máquina llena las columnas que le tocan
+        # (al exportar, directo; al importar, leyendo el UUID embebido en el
+        # .mcdiep y recalculando el hash de los bytes recibidos).
+        "ALTER TABLE requerimiento_batches ADD COLUMN agente_export_uuid TEXT",
+        "ALTER TABLE requerimiento_batches ADD COLUMN agente_export_hash TEXT",
+        "ALTER TABLE requerimiento_batches ADD COLUMN abogado_export_uuid TEXT",
+        "ALTER TABLE requerimiento_batches ADD COLUMN abogado_export_hash TEXT",
+        "ALTER TABLE revision_imports ADD COLUMN imported_uuid TEXT",
+        "ALTER TABLE revision_imports ADD COLUMN imported_hash TEXT",
+        # SQLite no permite modificar un CHECK existente con ALTER TABLE --
+        # hay que reconstruir la tabla. Hace falta porque "HOJA DE CAMPO" se
+        # agregó como tercera opción de recibe_citatorio/quien_recibe pero el
+        # CHECK original (creado en versiones anteriores del esquema) sólo
+        # permitía 'EN PUERTA'/'NOMBRE'; sin este ajuste, guardar esa opción
+        # fallaría con un error de integridad en instalaciones existentes.
+        """CREATE TABLE requerimiento_rows_v10 (
+            id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_id                 INTEGER NOT NULL REFERENCES requerimiento_batches(id),
+            folio                    TEXT,
+            cta_predial              TEXT,
+            contribuyente            TEXT,
+            domicilio                TEXT,
+            fecha_citatorio          TEXT,
+            recibe_citatorio         TEXT CHECK (recibe_citatorio IN ('EN PUERTA', 'NOMBRE', 'HOJA DE CAMPO')),
+            recibe_citatorio_nombre  TEXT,
+            fecha_notificacion       TEXT,
+            quien_recibe             TEXT CHECK (quien_recibe IN ('EN PUERTA', 'NOMBRE', 'HOJA DE CAMPO')),
+            quien_recibe_nombre      TEXT,
+            captured_at              TEXT
+        )""",
+        """INSERT INTO requerimiento_rows_v10
+            SELECT id, batch_id, folio, cta_predial, contribuyente, domicilio,
+                   fecha_citatorio, recibe_citatorio, recibe_citatorio_nombre,
+                   fecha_notificacion, quien_recibe, quien_recibe_nombre, captured_at
+            FROM requerimiento_rows""",
+        "DROP TABLE requerimiento_rows",
+        "ALTER TABLE requerimiento_rows_v10 RENAME TO requerimiento_rows",
     ],
 }
 

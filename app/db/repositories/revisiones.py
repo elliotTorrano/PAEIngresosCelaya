@@ -37,6 +37,8 @@ class RevisionImport:
     status_changed_at: str
     total_rows: int
     reviewed_rows: int
+    imported_uuid: str | None
+    imported_hash: str | None
 
     @property
     def is_reviewed(self) -> bool:
@@ -55,6 +57,8 @@ class RevisionImport:
             status_changed_at=row["status_changed_at"],
             total_rows=row["total_rows"],
             reviewed_rows=row["reviewed_rows"],
+            imported_uuid=row["imported_uuid"],
+            imported_hash=row["imported_hash"],
         )
 
 
@@ -104,15 +108,17 @@ class RevisionRow:
 
 
 def create_revision_import(
-    *, agente_id: int, source_filename: str, abogado_nombre: str | None, abogado_id: int | None
+    *, agente_id: int, source_filename: str, abogado_nombre: str | None, abogado_id: int | None,
+    imported_uuid: str | None = None, imported_hash: str | None = None,
 ) -> int:
     conn = get_connection()
     cur = conn.execute(
         """
-        INSERT INTO revision_imports (agente_id, source_filename, abogado_nombre, abogado_id)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO revision_imports
+            (agente_id, source_filename, abogado_nombre, abogado_id, imported_uuid, imported_hash)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (agente_id, source_filename, abogado_nombre, abogado_id),
+        (agente_id, source_filename, abogado_nombre, abogado_id, imported_uuid, imported_hash),
     )
     conn.commit()
     return cur.lastrowid  # type: ignore[return-value]
@@ -157,7 +163,7 @@ def list_revision_imports(agente_id: int) -> list[RevisionImport]:
     rows = conn.execute(
         """
         SELECT ri.id, ri.agente_id, ri.source_filename, ri.abogado_nombre, ri.abogado_id, ri.imported_at,
-               ri.status, ri.status_changed_at,
+               ri.status, ri.status_changed_at, ri.imported_uuid, ri.imported_hash,
                COUNT(rr.id) AS total_rows,
                SUM(CASE WHEN rr.procede IS NOT NULL THEN 1 ELSE 0 END) AS reviewed_rows
         FROM revision_imports ri
@@ -169,6 +175,24 @@ def list_revision_imports(agente_id: int) -> list[RevisionImport]:
         (agente_id,),
     ).fetchall()
     return [RevisionImport.from_row(r) for r in rows]
+
+
+def get_revision_import(revision_import_id: int) -> RevisionImport | None:
+    conn = get_connection()
+    row = conn.execute(
+        """
+        SELECT ri.id, ri.agente_id, ri.source_filename, ri.abogado_nombre, ri.abogado_id, ri.imported_at,
+               ri.status, ri.status_changed_at, ri.imported_uuid, ri.imported_hash,
+               COUNT(rr.id) AS total_rows,
+               SUM(CASE WHEN rr.procede IS NOT NULL THEN 1 ELSE 0 END) AS reviewed_rows
+        FROM revision_imports ri
+        LEFT JOIN revision_rows rr ON rr.revision_import_id = ri.id
+        WHERE ri.id = ?
+        GROUP BY ri.id
+        """,
+        (revision_import_id,),
+    ).fetchone()
+    return RevisionImport.from_row(row) if row else None
 
 
 def list_revision_rows_for_import(revision_import_id: int) -> list[RevisionRow]:

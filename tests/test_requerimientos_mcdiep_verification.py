@@ -37,10 +37,10 @@ def test_valid_file_returns_rows_and_signer(tmp_path, db):
         path, agente=agente, abogado=abogado, private_key=private_key,
     )
 
-    rows, signer = parse_agente_export_file(path, abogado=abogado)
+    result = parse_agente_export_file(path, abogado=abogado)
 
-    assert len(rows) == 1
-    assert signer.id == agente.id
+    assert len(result.rows) == 1
+    assert result.agente.id == agente.id
 
 
 def test_unknown_signer_is_rejected(tmp_path, db):
