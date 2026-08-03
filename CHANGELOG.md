@@ -1,5 +1,22 @@
 # Historial de versiones — Sistema PAE
 
+## 0.29.0
+
+- **"Generar Formato" (Requerimiento y Mandamiento) del Agente del PAE**
+  ahora exporta también un **.xlsx de respaldo**, además del .mcdiep y el
+  PDF que ya generaba -- mismos datos, en un formato universal abrible con
+  cualquier hoja de cálculo.
+- Es una medida adicional de control de archivos: si el .mcdiep se daña,
+  se pierde, o algo falla en el programa, el .xlsx conserva un respaldo
+  legible de exactamente lo que se exportó. No reemplaza al .mcdiep -- el
+  Abogado lo sigue necesitando para importar dentro del programa; el .xlsx
+  es sólo respaldo/control, no se abre desde Sistema PAE.
+- La exportación de "Revisar Formato" (`export_revision`) ya era un .xlsx
+  por sí sola desde antes -- no necesitó cambios.
+- Las exportaciones de prueba de `agente_dummy` no llevan este respaldo
+  (siguen siendo sólo .mcdiep + PDF de una página, sin datos reales que
+  proteger).
+
 ## 0.28.0
 
 - **"Generar Formato" (Requerimiento y Mandamiento) para `agente_dummy`**

@@ -76,6 +76,23 @@ def export_for_abogado(rows: list[dict], output_path: Path, *, agente: User, abo
     mcdiep_format.write_envelope(output_path, envelope)
 
 
+def export_agente_backup_xlsx(rows: list[dict], output_path: Path) -> None:
+    """Respaldo en Excel de lo mismo que ya se exportó en .mcdiep/.pdf --
+    medida adicional de control de archivos: si el .mcdiep no se puede leer
+    (dañado, se pierde, algo falla en el programa) este .xlsx conserva los
+    mismos datos en un formato universal, abrible con cualquier hoja de
+    cálculo. No reemplaza al .mcdiep -- el Abogado sigue necesitando el
+    .mcdiep firmado para importarlo dentro del programa; este archivo es
+    sólo respaldo/control, no se abre desde Sistema PAE."""
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Respaldo"
+    sheet.append(HEADERS_AGENTE)
+    for row in rows:
+        sheet.append([row["folio"], row["cta_predial"], row["contribuyente"], row["domicilio"]])
+    workbook.save(output_path)
+
+
 def build_abogado_envelope(rows: list[RequerimientoRow], *, document_uuid: str | None = None) -> mcdiep_format.McdiepEnvelope:
     """Arma (sin escribir a disco) el envelope Abogado -> Agente -- separado
     de `export_captured` por la misma razón que `build_agente_envelope`."""

@@ -57,6 +57,18 @@ def build_agente_envelope(
     )
 
 
+def export_agente_backup_xlsx(rows: list[dict], output_path: Path) -> None:
+    """Respaldo en Excel de lo mismo que ya se exportó en .mcdiep/.pdf. Ver
+    app/excel_io/requerimientos_export.py::export_agente_backup_xlsx."""
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Respaldo"
+    sheet.append(HEADERS_AGENTE)
+    for row in rows:
+        sheet.append([row["folio"], row["cta_predial"], row["contribuyente"]])
+    workbook.save(output_path)
+
+
 def build_abogado_envelope(rows: list[MandamientoRow], *, document_uuid: str | None = None) -> mcdiep_format.McdiepEnvelope:
     """Arma (sin escribir a disco) el envelope Abogado -> Agente."""
     payload = {

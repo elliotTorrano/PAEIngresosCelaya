@@ -24,7 +24,7 @@ from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import users as users_repo
 from app.excel_io import mcdiep_format
 from app.excel_io.duplicates import find_duplicate_filenames
-from app.excel_io.requerimientos_export import build_agente_envelope
+from app.excel_io.requerimientos_export import build_agente_envelope, export_agente_backup_xlsx
 from app.excel_io.requerimientos_import import parse_requerimientos_file
 from app.pdf_io import requerimientos_pdf
 from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
@@ -324,10 +324,17 @@ class RequerimientosGenerarView(QWidget):
                 filename=output_path.name, identity=identity,
             )
 
+            # Respaldo adicional en Excel de lo mismo ya exportado -- por si
+            # el .mcdiep se daña, se pierde, o algo falla en el programa, no
+            # se pierde el control de qué se exportó.
+            xlsx_path = output_path.with_suffix(".xlsx")
+            export_agente_backup_xlsx(self._rows, xlsx_path)
+
             QMessageBox.information(
                 self, "Exportado",
                 f"Se exportaron y firmaron {len(self._rows)} filas para {abogado.full_name}:\n{output_path}\n"
-                f"PDF: {pdf_path}\n\nUUID: {identity.uuid}\nHash: {identity.file_hash}",
+                f"PDF: {pdf_path}\nExcel de respaldo: {xlsx_path}\n\n"
+                f"UUID: {identity.uuid}\nHash: {identity.file_hash}",
             )
 
         self._rows = []

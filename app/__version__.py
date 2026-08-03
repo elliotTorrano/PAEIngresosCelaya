@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.28.0"
+__version__ = "0.29.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -303,4 +303,15 @@ VERSION_NOTES = {
               "archivo generado sólo sirve para revisar visualmente el "
               "formato. 'Revisar Formato' y la captura del 'abogado_dummy' "
               "siguen en modo simulación completa (sin archivo real).",
+    "0.29.0": "'Generar Formato' (Requerimiento y Mandamiento) del Agente "
+              "del PAE ahora exporta también un .xlsx de respaldo, junto al "
+              ".mcdiep y el PDF ya existentes -- mismos datos exportados, "
+              "en un formato universal que se puede abrir con cualquier "
+              "hoja de cálculo. Es una medida adicional de control: si el "
+              ".mcdiep se daña, se pierde o algo falla en el programa, el "
+              ".xlsx conserva un respaldo legible de lo que se exportó. No "
+              "reemplaza al .mcdiep -- el Abogado lo sigue necesitando "
+              "para importar dentro del programa. Esto no aplica a las "
+              "exportaciones de prueba de 'agente_dummy' (siguen siendo "
+              "sólo .mcdiep + PDF de una página).",
 }
