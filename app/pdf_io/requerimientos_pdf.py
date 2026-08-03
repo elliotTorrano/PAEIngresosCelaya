@@ -36,6 +36,7 @@ from app.auth.crypto_certs import sign_challenge
 from app.config import QUIEN_RECIBE_EN_PUERTA, QUIEN_RECIBE_HOJA_CAMPO, QUIEN_RECIBE_NOMBRE
 from app.db.repositories.requerimientos import RequerimientoRow
 from app.db.repositories.users import User
+from app.ui.widgets import theme
 from app.ui.widgets.styles import login_background_path
 from app.utils.filenames import sanitize_filename
 
@@ -152,6 +153,7 @@ def _header_image() -> Image:
 def _build_header_table(
     available_width: float, *, abogado_nombre: str, counts: dict[str, int],
     include_notificacion_counters: bool, identity: DocumentIdentity,
+    formato_titulo: str = "FORMATO: ENTREGA DE REQUERIMIENTOS DE PAGO",
 ) -> Table:
     fecha = datetime.now().strftime("%d/%m/%Y")
     counter_lines = []
@@ -177,7 +179,7 @@ def _build_header_table(
     data = [
         [left_cell, Paragraph("MUNICIPIO DE CELAYA GUANAJUATO", _STYLE_TITLE), ""],
         ["", Paragraph("TESORERÍA MUNICIPAL", _STYLE_SUBTITLE), ""],
-        ["", Paragraph("FORMATO: ENTREGA DE REQUERIMIENTOS DE PAGO", _STYLE_FORMATO), ""],
+        ["", Paragraph(formato_titulo, _STYLE_FORMATO), ""],
         ["", Paragraph("IMPUESTO PREDIAL", _STYLE_SUBTITLE), ""],
         ["", Paragraph("Dirección: Ingresos | Jefatura de Ejecución y Seguimiento", _STYLE_INFO), ""],
         ["", Paragraph("Procedimiento Administrativo de Ejecución", _STYLE_INFO), ""],
@@ -229,9 +231,14 @@ def _build_body_table(available_width: float, headers: list[str], table_rows: li
     for row in table_rows:
         data.append([Paragraph(str(cell) if cell is not None else "", _STYLE_CELL) for cell in row])
 
+    # La paleta guardada del PDF -- independiente de la de interfaz y de
+    # cualquier vista previa sin confirmar. Un documento oficial nunca debe
+    # llevar un color que sólo se estaba probando en pantalla, ni cambiar
+    # sólo porque alguien ajustó la interfaz a su gusto.
+    header_color = theme.saved_pdf_colors()["critico"]
     table = Table(data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2d4a63")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(header_color)),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("TOPPADDING", (0, 0), (-1, -1), 2),
@@ -332,17 +339,20 @@ def _render_pdf(
     pdf_path: Path, *, agente_nombre: str, abogado_nombre: str, filename: str, headers: list[str],
     table_rows: list[list[str]], quien_recibe_values: list[str | None], total_mode: str,
     include_notificacion_counters: bool, identity: DocumentIdentity,
+    formato_titulo: str = "FORMATO: ENTREGA DE REQUERIMIENTOS DE PAGO",
+    documento_titulo: str = "Entrega de Requerimientos de Pago",
 ) -> None:
     counts = _compute_counts(quien_recibe_values, total_mode=total_mode)
     doc = SimpleDocTemplate(
         str(pdf_path), pagesize=PAGE_SIZE,
         leftMargin=MARGIN, rightMargin=MARGIN, topMargin=MARGIN, bottomMargin=BOTTOM_MARGIN,
-        title="Entrega de Requerimientos de Pago",
+        title=documento_titulo,
     )
     story = [
         _build_header_table(
             doc.width, abogado_nombre=abogado_nombre, counts=counts,
             include_notificacion_counters=include_notificacion_counters, identity=identity,
+            formato_titulo=formato_titulo,
         ),
         Spacer(1, 10),
         _build_body_table(doc.width, headers, table_rows),

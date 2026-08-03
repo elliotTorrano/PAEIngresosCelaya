@@ -18,6 +18,7 @@ from app.auth.enrollment import enroll_certificate
 from app.config import window_title
 from app.db.repositories.users import User
 from app.ui.login.recovery_code_dialog import RecoveryCodeDisplayDialog
+from app.ui.widgets.styles import apply_base_style
 
 
 class EnrollmentDialog(QDialog):
@@ -29,6 +30,7 @@ class EnrollmentDialog(QDialog):
 
     def __init__(self, user: User, parent=None):
         super().__init__(parent)
+        apply_base_style(self)
         self.user = user
         self.deferred = False
         self.setWindowTitle(window_title("Generar certificado de acceso"))

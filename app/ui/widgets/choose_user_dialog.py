@@ -17,11 +17,13 @@ from PySide6.QtWidgets import (
 
 from app.config import ROLE_ABOGADO, ROLE_AGENTE_PAE, ROLE_LABELS, window_title
 from app.db.repositories import users as users_repo
+from app.ui.widgets.styles import apply_base_style
 
 
 class ChooseUserDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+        apply_base_style(self)
         self.setWindowTitle(window_title("Ver como..."))
         self.selected_user: users_repo.User | None = None
 

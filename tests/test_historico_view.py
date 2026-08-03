@@ -1,4 +1,5 @@
 from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
+from app.db.repositories import mandamientos as mand_repo
 from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import users as users_repo
 from app.ui.widgets.historico_view import HistoricoView
@@ -32,9 +33,9 @@ def test_historico_view_shows_only_agente_own_files(qapp, db):
 
     view = HistoricoView(agente1)
 
-    assert view.table.rowCount() == 1
-    assert view.table.item(0, 0).text() == "mio.xlsx"
-    assert view.table.item(0, 2).text() == "Abogado Uno"
+    assert view.table_requerimiento.rowCount() == 1
+    assert view.table_requerimiento.item(0, 0).text() == "mio.xlsx"
+    assert view.table_requerimiento.item(0, 2).text() == "Abogado Uno"
 
 
 def test_historico_view_shows_only_abogado_own_files(qapp, db):
@@ -51,6 +52,25 @@ def test_historico_view_shows_only_abogado_own_files(qapp, db):
 
     view = HistoricoView(abogado1)
 
-    assert view.table.rowCount() == 1
-    assert view.table.item(0, 0).text() == "mio.xlsx"
-    assert view.table.item(0, 2).text() == "Agente Uno"
+    assert view.table_requerimiento.rowCount() == 1
+    assert view.table_requerimiento.item(0, 0).text() == "mio.xlsx"
+    assert view.table_requerimiento.item(0, 2).text() == "Agente Uno"
+
+
+def test_historico_view_shows_mandamiento_tab_separately(qapp, db):
+    agente = _make_agente()
+    abogado = _make_abogado()
+
+    req_repo.record_imported_file(
+        original_filename="requerimiento.xlsx", agente_id=agente.id, abogado_id=abogado.id, row_count=1
+    )
+    mand_repo.record_imported_file(
+        original_filename="mandamiento.xlsx", agente_id=agente.id, abogado_id=abogado.id, row_count=2
+    )
+
+    view = HistoricoView(agente)
+
+    assert view.table_requerimiento.rowCount() == 1
+    assert view.table_requerimiento.item(0, 0).text() == "requerimiento.xlsx"
+    assert view.table_mandamiento.rowCount() == 1
+    assert view.table_mandamiento.item(0, 0).text() == "mandamiento.xlsx"

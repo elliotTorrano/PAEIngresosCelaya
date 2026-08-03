@@ -1,4 +1,7 @@
-"""Agente del PAE: selecciona abogado, carga Excel y exporta el formato firmado."""
+"""Agente del PAE: selecciona abogado, carga Excel y exporta el formato de
+Mandamientos firmado. Mismo flujo que
+app/ui/agente/requerimientos_generar_view.py, sin la columna DOMICILIO (el
+Excel de origen de Mandamiento sólo trae FOLIO, CTA PREDIAL y CONTRIBUYENTE)."""
 
 from __future__ import annotations
 
@@ -20,18 +23,18 @@ from PySide6.QtWidgets import (
 )
 
 from app.config import ROLE_ABOGADO
-from app.db.repositories import requerimientos as req_repo
+from app.db.repositories import mandamientos as mand_repo
 from app.db.repositories import users as users_repo
 from app.excel_io import mcdiep_format
 from app.excel_io.duplicates import find_duplicate_filenames
-from app.excel_io.requerimientos_export import build_agente_envelope
-from app.excel_io.requerimientos_import import parse_requerimientos_file
-from app.pdf_io import requerimientos_pdf
+from app.excel_io.mandamientos_export import build_agente_envelope
+from app.excel_io.mandamientos_import import parse_mandamientos_file
+from app.pdf_io import mandamientos_pdf
 from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
 from app.utils.paths import exports_dir
 
 
-class RequerimientosGenerarView(QWidget):
+class MandamientosGenerarView(QWidget):
     def __init__(self, agente_user: users_repo.User, parent=None, simulate: bool = False):
         super().__init__(parent)
         self.agente_user = agente_user
@@ -70,8 +73,8 @@ class RequerimientosGenerarView(QWidget):
         self.files_label.setWordWrap(True)
         layout.addWidget(self.files_label)
 
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["FOLIO", "CTA PREDIAL", "CONTRIBUYENTE", "DOMICILIO"])
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["FOLIO", "CTA PREDIAL", "CONTRIBUYENTE"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -114,7 +117,7 @@ class RequerimientosGenerarView(QWidget):
                 continue
 
             try:
-                result = parse_requerimientos_file(path)
+                result = parse_mandamientos_file(path)
             except Exception as exc:  # noqa: BLE001
                 failed.append(f"{path.name}: {exc}")
                 continue
@@ -130,7 +133,7 @@ class RequerimientosGenerarView(QWidget):
             if not self.simulate:
                 # Histórico permanente de subidas: quién, cuándo y cuántas filas.
                 # No se restringe por repetición -- eso sólo aplica al lote en curso.
-                req_repo.record_imported_file(
+                mand_repo.record_imported_file(
                     original_filename=path.name, agente_id=self.agente_user.id, abogado_id=abogado_id,
                     row_count=result.row_count,
                 )
@@ -170,7 +173,6 @@ class RequerimientosGenerarView(QWidget):
                 self.table.setItem(r, 0, QTableWidgetItem(row["folio"] or ""))
                 self.table.setItem(r, 1, QTableWidgetItem(row["cta_predial"] or ""))
                 self.table.setItem(r, 2, QTableWidgetItem(row["contribuyente"] or ""))
-                self.table.setItem(r, 3, QTableWidgetItem(row["domicilio"] or ""))
         finally:
             self.table.setUpdatesEnabled(True)
 
@@ -214,16 +216,16 @@ class RequerimientosGenerarView(QWidget):
             if confirm_dialog.exec() != QDialog.DialogCode.Accepted:
                 return
 
-            document_uuid = requerimientos_pdf.new_document_uuid()
+            document_uuid = mandamientos_pdf.new_document_uuid()
             envelope = build_agente_envelope(
                 self._rows, agente=self.agente_user, abogado=abogado,
                 private_key=confirm_dialog.private_key, document_uuid=document_uuid,
             )
             mcdiep_bytes = mcdiep_format.envelope_bytes(envelope)
-            identity = requerimientos_pdf.compute_identity(
+            identity = mandamientos_pdf.compute_identity(
                 mcdiep_bytes, document_uuid=document_uuid, private_key=confirm_dialog.private_key,
             )
-            filename = requerimientos_pdf.suggested_filename(
+            filename = mandamientos_pdf.suggested_filename(
                 agente_nombre=self.agente_user.full_name, abogado_nombre=abogado.full_name,
                 identity=identity, extension=mcdiep_format.EXTENSION,
             )
@@ -243,19 +245,19 @@ class RequerimientosGenerarView(QWidget):
                 if overwrite != QMessageBox.StandardButton.Yes:
                     return
 
-            batch_id = req_repo.create_batch(abogado_id=abogado_id, agente_id=self.agente_user.id)
-            req_repo.add_rows(batch_id, self._rows)
-            req_repo.link_imported_files_to_batch(
+            batch_id = mand_repo.create_batch(abogado_id=abogado_id, agente_id=self.agente_user.id)
+            mand_repo.add_rows(batch_id, self._rows)
+            mand_repo.link_imported_files_to_batch(
                 agente_id=self.agente_user.id, filenames=self._source_filenames, batch_id=batch_id
             )
 
             output_path.write_bytes(mcdiep_bytes)
-            req_repo.set_batch_export_path(
+            mand_repo.set_batch_export_path(
                 batch_id, agente_path=str(output_path),
                 agente_uuid=identity.uuid, agente_hash=identity.file_hash,
             )
             pdf_path = output_path.with_suffix(".pdf")
-            requerimientos_pdf.export_agente_pdf(
+            mandamientos_pdf.export_agente_pdf(
                 pdf_path, agente=self.agente_user, abogado=abogado, rows=self._rows,
                 filename=output_path.name, identity=identity,
             )

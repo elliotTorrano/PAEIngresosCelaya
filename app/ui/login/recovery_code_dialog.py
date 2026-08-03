@@ -19,6 +19,7 @@ from app.auth.recovery_codes import verify_recovery_code
 from app.config import window_title
 from app.db.repositories import users as users_repo
 from app.db.repositories.users import User
+from app.ui.widgets.styles import apply_base_style
 
 
 class RecoveryCodeDisplayDialog(QDialog):
@@ -27,6 +28,7 @@ class RecoveryCodeDisplayDialog(QDialog):
 
     def __init__(self, code: str, parent=None):
         super().__init__(parent)
+        apply_base_style(self)
         self.setWindowTitle(window_title("Código de respaldo"))
         self.setMinimumWidth(420)
 
@@ -66,6 +68,7 @@ class RecoveryCodeRecoveryDialog(QDialog):
 
     def __init__(self, user: User, parent=None):
         super().__init__(parent)
+        apply_base_style(self)
         self.user = user
         self.recovered = False
         self.setWindowTitle(window_title("Recuperar con código de respaldo"))

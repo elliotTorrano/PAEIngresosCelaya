@@ -79,8 +79,8 @@ def _import_rows(agente_id, *, source_filename, rows):
     return revision_import_id
 
 
-def _select_estado(view, estado):
-    view.estado_combo.setCurrentIndex(view.estado_combo.findData(estado))
+def _select_estado(page, estado):
+    page.estado_combo.setCurrentIndex(page.estado_combo.findData(estado))
 
 
 # --- Listado por estado ------------------------------------------------------------------
@@ -94,9 +94,10 @@ def test_generados_lists_exported_batches(qapp, db, tmp_path):
     _make_generated_batch(agente, abogado, tmp_path)
 
     view = SeguimientoView(agente)
-    assert view.estado_combo.currentData() == STATE_GENERADOS
-    assert view.table.rowCount() == 1
-    assert view.table.item(0, 1).text() == "Abogado Uno"
+    page = view.requerimiento_page
+    assert page.estado_combo.currentData() == STATE_GENERADOS
+    assert page.table.rowCount() == 1
+    assert page.table.item(0, 1).text() == "Abogado Uno"
 
 
 def test_en_revision_lists_unfinished_imports(qapp, db):
@@ -107,11 +108,12 @@ def test_en_revision_lists_unfinished_imports(qapp, db):
     import_id = _import_rows(agente.id, source_filename="lote1.mcdiep", rows=[_row("F1")])
 
     view = SeguimientoView(agente)
-    _select_estado(view, STATE_EN_REVISION)
+    page = view.requerimiento_page
+    _select_estado(page, STATE_EN_REVISION)
 
-    assert view.table.rowCount() == 1
-    assert view.table.item(0, 0).text() == "lote1.mcdiep"
-    assert view._current_ids == [import_id]
+    assert page.table.rowCount() == 1
+    assert page.table.item(0, 0).text() == "lote1.mcdiep"
+    assert page._current_ids == [import_id]
 
 
 def test_pendiente_reporte_lists_fully_reviewed_imports(qapp, db):
@@ -124,13 +126,14 @@ def test_pendiente_reporte_lists_fully_reviewed_imports(qapp, db):
     revisiones_repo.update_revision_procede(row_id, "PROCEDE")
 
     view = SeguimientoView(agente)
-    _select_estado(view, STATE_PENDIENTE_REPORTE)
+    page = view.requerimiento_page
+    _select_estado(page, STATE_PENDIENTE_REPORTE)
 
-    assert view.table.rowCount() == 1
-    assert view._current_ids == [import_id]
+    assert page.table.rowCount() == 1
+    assert page._current_ids == [import_id]
 
-    _select_estado(view, STATE_EN_REVISION)
-    assert view.table.rowCount() == 0  # ya no aparece ahí
+    _select_estado(page, STATE_EN_REVISION)
+    assert page.table.rowCount() == 0  # ya no aparece ahí
 
 
 def test_reportes_enviados_is_always_empty(qapp, db):
@@ -143,9 +146,10 @@ def test_reportes_enviados_is_always_empty(qapp, db):
     revisiones_repo.update_revision_procede(row_id, "PROCEDE")
 
     view = SeguimientoView(agente)
-    _select_estado(view, STATE_REPORTE_ENVIADO)
+    page = view.requerimiento_page
+    _select_estado(page, STATE_REPORTE_ENVIADO)
 
-    assert view.table.rowCount() == 0
+    assert page.table.rowCount() == 0
 
 
 def test_mandamiento_tab_shows_placeholder(qapp, db):
@@ -165,10 +169,11 @@ def test_generados_action_without_selection_shows_information(qapp, db, tmp_path
     _make_generated_batch(agente, abogado, tmp_path)
 
     view = SeguimientoView(agente)
-    view.table.setCurrentCell(-1, -1)
+    page = view.requerimiento_page
+    page.table.setCurrentCell(-1, -1)
 
     with patch("app.ui.agente.seguimiento_view.QMessageBox.information") as mock_info:
-        view._on_action_clicked()
+        page._on_action_clicked()
 
     mock_info.assert_called_once()
 
@@ -179,13 +184,14 @@ def test_generados_reexport_declined_confirmation_does_nothing(qapp, db, tmp_pat
     batch_id = _make_generated_batch(agente, abogado, tmp_path)
 
     view = SeguimientoView(agente)
-    view.table.selectRow(0)
+    page = view.requerimiento_page
+    page.table.selectRow(0)
 
     with patch(
         "app.ui.agente.seguimiento_view.QMessageBox.question",
         return_value=QMessageBox.StandardButton.No,
     ), patch("app.ui.agente.seguimiento_view.QFileDialog.getSaveFileName") as mock_save:
-        view._on_action_clicked()
+        page._on_action_clicked()
 
     mock_save.assert_not_called()
     del batch_id, pfx_path
@@ -200,7 +206,8 @@ def test_generados_reexport_confirmed_creates_new_file_and_updates_timestamp(qap
     new_path = tmp_path / "reexportado.mcdiep"
 
     view = SeguimientoView(agente)
-    view.table.selectRow(0)
+    page = view.requerimiento_page
+    page.table.selectRow(0)
 
     with patch(
         "app.ui.agente.seguimiento_view.QMessageBox.question",
@@ -211,7 +218,7 @@ def test_generados_reexport_confirmed_creates_new_file_and_updates_timestamp(qap
         "app.ui.agente.seguimiento_view.QFileDialog.getSaveFileName",
         return_value=(str(new_path), ""),
     ), patch("app.ui.agente.seguimiento_view.QMessageBox.information"):
-        view._on_action_clicked()
+        page._on_action_clicked()
 
     assert new_path.exists()
     batch = req_repo.get_batch(batch_id)
@@ -226,7 +233,8 @@ def test_generados_reexport_cancelled_file_dialog_creates_no_file(qapp, db, tmp_
     original_path = req_repo.get_batch(batch_id)["exported_agente_path"]
 
     view = SeguimientoView(agente)
-    view.table.selectRow(0)
+    page = view.requerimiento_page
+    page.table.selectRow(0)
 
     with patch(
         "app.ui.agente.seguimiento_view.QMessageBox.question",
@@ -236,7 +244,7 @@ def test_generados_reexport_cancelled_file_dialog_creates_no_file(qapp, db, tmp_
     ), patch(
         "app.ui.agente.seguimiento_view.QFileDialog.getSaveFileName", return_value=("", ""),
     ):
-        view._on_action_clicked()
+        page._on_action_clicked()
 
     assert req_repo.get_batch(batch_id)["exported_agente_path"] == original_path
 
@@ -251,14 +259,15 @@ def test_en_revision_action_emits_signal_with_import_id(qapp, db):
     import_id = _import_rows(agente.id, source_filename="lote1.mcdiep", rows=[_row("F1")])
 
     view = SeguimientoView(agente)
-    _select_estado(view, STATE_EN_REVISION)
-    view.table.selectRow(0)
+    page = view.requerimiento_page
+    _select_estado(page, STATE_EN_REVISION)
+    page.table.selectRow(0)
 
     received = []
-    view.continuar_revision_solicitada.connect(received.append)
-    view._on_action_clicked()
+    view.continuar_revision_solicitada.connect(lambda tipo, rid: received.append((tipo, rid)))
+    page._on_action_clicked()
 
-    assert received == [import_id]
+    assert received == [("requerimiento", import_id)]
 
 
 # --- Acción PENDIENTE DE ENVIAR / REPORTES ENVIADOS: aún no implementadas -----------------
@@ -273,11 +282,12 @@ def test_pendiente_reporte_action_shows_proximamente_placeholder(qapp, db):
     revisiones_repo.update_revision_procede(row_id, "PROCEDE")
 
     view = SeguimientoView(agente)
-    _select_estado(view, STATE_PENDIENTE_REPORTE)
-    view.table.selectRow(0)
+    page = view.requerimiento_page
+    _select_estado(page, STATE_PENDIENTE_REPORTE)
+    page.table.selectRow(0)
 
     with patch("app.ui.agente.seguimiento_view.QMessageBox.information") as mock_info:
-        view._on_action_clicked()
+        page._on_action_clicked()
 
     mock_info.assert_called_once()
     assert "Próximamente" in mock_info.call_args[0][1]

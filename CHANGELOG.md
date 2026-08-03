@@ -1,5 +1,105 @@
 # Historial de versiones — Sistema PAE
 
+## 0.26.0
+
+- El **Agente del PAE** ya tiene acceso propio a "Colores" desde el menú
+  "Otros": puede personalizar los colores de SU interfaz (menús, botones,
+  pestañas) con "Restaurar predeterminados", "Aplicar (vista previa)" y
+  "Guardar cambios de interfaz" -- igual que Administrador/Súper-usuario,
+  pero **sin** el botón "Guardar cambios del PDF": el color de los PDF
+  exportados sigue siendo exclusivo de Administrador/Súper-usuario, porque
+  es un documento oficial y debe ser el mismo para todos.
+- El **Abogado** sigue sin acceso a "Colores": siempre ve la interfaz con
+  los colores que estén guardados en ese momento, sin poder cambiarlos.
+
+## 0.25.0
+
+- En la pestaña "Colores", el botón único **"Guardar como predeterminado"**
+  se separó en dos botones independientes, cada uno con su propia
+  confirmación:
+  - **"Guardar cambios de interfaz"**: deja fijos los colores de pantalla
+    (menús, botones, pestañas). No afecta el PDF.
+  - **"Guardar cambios del PDF"**: deja fijo el color del encabezado de
+    tabla de los PDF exportados (Requerimiento y Mandamiento). No afecta la
+    interfaz.
+- Motivo: la interfaz puede ajustarse al gusto de quien use el programa en
+  esa computadora, pero el PDF es un documento oficial -- su color sólo
+  debe cambiar cuando alguien lo decida explícitamente, no como efecto
+  colateral de personalizar la pantalla.
+- Ambas paletas se guardan por separado en `pae.db` y sobreviven cualquier
+  actualización futura del programa, igual que antes.
+- Nueva etiqueta en la pestaña "Colores" que muestra el color actualmente
+  guardado para el encabezado del PDF.
+
+## 0.24.0
+
+- **Nueva pestaña "Colores"** (Administrador/Súper-usuario), junto a
+  "Apariencia": permite personalizar los 3 colores base del programa
+  escribiendo el código hexadecimal deseado --
+  - **Identidad** (menús, pestañas, botones de uso diario)
+  - **Crítico** (Exportar/Firmar, encabezados de tabla y del PDF)
+  - **Estructura** (bordes y separadores)
+  Cada campo tiene una muestra de color en vivo mientras se escribe.
+- **"Aplicar (vista previa)"**: prueba los colores de inmediato en TODAS
+  las ventanas abiertas del programa (no sólo la pestaña de Colores), para
+  poder revisarlos visualmente antes de decidir nada. No es permanente: si
+  no se guardan, se pierden en cuanto se reinicia el programa.
+- **"Restaurar predeterminados"**: vuelve en cualquier momento a la
+  combinación de fábrica (verde `#3A6B46` / guinda `#8A1E2D` / ocre
+  `#A67242`), sin importar qué se haya guardado después.
+- **"Guardar como predeterminado"**: pide confirmación explícita
+  (advirtiendo que el cambio afecta a todo el programa y no se puede
+  deshacer) y deja los colores fijos de forma permanente -- se guardan en
+  la base de datos local (`pae.db`), así que sobreviven cualquier
+  actualización futura del programa (a diferencia de la hoja de estilos
+  de fábrica, que viaja empacada dentro del propio `.exe`).
+- El encabezado de tabla del PDF exportado ahora sigue el color "crítico"
+  realmente **guardado** -- nunca una vista previa sin confirmar, para que
+  un documento oficial jamás lleve un color que sólo se estaba probando.
+
+## 0.23.0
+
+- **Nueva paleta institucional** en toda la interfaz, para los 4 roles:
+  - **Verde `#3A6B46`** -- color de uso diario: barras de menú/pestañas,
+    pestaña activa, botones secundarios (bordes y texto).
+  - **Guinda `#8A1E2D`** -- reservado para lo importante: botones de
+    "Exportar" (Generar/Revisar Formato, captura del Abogado), "Confirmar
+    identidad" (firma con certificado), "Iniciar sesión", y los
+    encabezados de todas las tablas.
+  - **Ocre `#A67242`** -- bordes, separadores y fondos suaves de pestañas
+    inactivas, grupos y campos.
+  - El login y los diálogos (confirmar certificado, cambiar contraseña,
+    código de respaldo, enrolamiento, olvidé mi contraseña, importar
+    actualización, ver como) ahora tienen estilo propio -- antes no
+    heredaban ningún QSS y se veían con la apariencia nativa de Windows.
+- **El encabezado de la tabla en el PDF exportado** (Requerimiento y
+  Mandamiento) cambia de azul a guinda `#8A1E2D`, para que coincida con
+  la pantalla.
+
+## 0.22.0
+
+- **Nuevo módulo de Mandamiento**, completo y en paralelo a Requerimiento --
+  ya no es el "(Próximamente)" del menú. Mismo flujo de punta a punta, con
+  tablas y pantallas propias para no tocar nada de lo ya existente:
+  - **Generar Formato** y **Revisar Formato** del Agente del PAE (submenú
+    "Mandamiento", junto al de "Requerimiento").
+  - **Formato de Mandamientos** del Abogado (importar, capturar
+    citatorio/notificación, finalizar/editar, exportar con o sin correo).
+  - **Seguimiento** del Agente: pestaña "Mandamiento" junto a la de
+    "Requerimiento", con sus 4 estados (Generados/En revisión/Pendientes de
+    reporte/Reportes enviados).
+  - **Histórico** (Agente/Abogado) y **Trazabilidad** (Administrador/
+    Súper-usuario): ambos ahora muestran Requerimiento y Mandamiento por
+    separado.
+  - **"Ver como"** del Súper-usuario también simula Mandamiento.
+  - Mismo sistema de identidad UUID/hash, firma digital y PDF de
+    acompañamiento (QR, sello estilo CFDI, doble cara) que Requerimiento.
+  - **Única diferencia real**: el Excel de origen de Mandamiento sólo trae
+    FOLIO, CTA PREDIAL y CONTRIBUYENTE (columnas B, C y D) -- no hay
+    DOMICILIO, ni en la captura ni en el PDF. El PDF lleva su propio
+    encabezado institucional ("FORMATO: ENTREGA DE MANDAMIENTOS DE
+    EJECUCIÓN").
+
 ## 0.21.2
 
 - **El instalador y el .exe pesan ~20 MB menos** (de ~77 MB a ~56 MB, un

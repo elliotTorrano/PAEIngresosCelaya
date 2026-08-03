@@ -8,6 +8,7 @@ import pytest
 
 from app.db import connection as connection_module
 from app.db.migrations import ensure_schema
+from app.ui.widgets import theme as theme_module
 from app.utils import paths as paths_module
 
 _REAL_RESOURCES_DIR = Path(__file__).resolve().parent.parent / "resources"
@@ -28,8 +29,10 @@ def db(tmp_path, monkeypatch):
     shutil.copytree(_REAL_RESOURCES_DIR, tmp_path / "resources")
     connection_module._connection = None
     ensure_schema()
+    theme_module.set_preview_colors(None)
     yield
     connection_module._connection = None
+    theme_module.set_preview_colors(None)
 
 
 @pytest.fixture(scope="session")

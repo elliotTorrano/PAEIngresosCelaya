@@ -8,6 +8,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QWidget
 
 from app.db.repositories import settings as settings_repo
+from app.ui.widgets import theme
 from app.ui.widgets.background_widget import BackgroundWidget
 from app.utils.paths import resource_dir
 
@@ -15,8 +16,34 @@ BASE_QSS_PATH = None  # se resuelve en tiempo de ejecución vía resource_dir()
 
 
 def _base_qss() -> str:
-    path = resource_dir() / "base_style.qss"
-    return path.read_text(encoding="utf-8") if path.exists() else ""
+    return theme.render_qss()
+
+
+def refresh_all_windows_theme() -> None:
+    """Vuelve a aplicar la hoja de estilos (con los colores activos ahora
+    mismo -- vista previa o guardados, ver app/ui/widgets/theme.py) a TODAS
+    las ventanas de nivel superior abiertas en este momento (la MainWindow y
+    cualquier diálogo abierto), para que un cambio de color se note de
+    inmediato en toda la interfaz sin tener que cerrar y reabrir nada."""
+    app = QApplication.instance()
+    if app is None:
+        return
+    for widget in app.topLevelWidgets():
+        if not widget.isVisible():
+            continue
+        central = widget.centralWidget() if hasattr(widget, "centralWidget") else None
+        style_target = central if central is not None else widget
+        style_target.setStyleSheet(_base_qss())
+
+
+def apply_base_style(widget: QWidget) -> None:
+    """Aplica la hoja de estilos base (paleta institucional) directamente a
+    `widget` -- para ventanas que no son la MainWindow (login, diálogos de
+    certificado/contraseña/etc.), que no heredan el stylesheet de nadie más
+    porque cada QDialog es su propia ventana de nivel superior. A diferencia
+    de `apply_window_background`, no toca fondo/ícono -- sólo colores/bordes
+    de controles."""
+    widget.setStyleSheet(_base_qss())
 
 
 def default_icon_path() -> Path:

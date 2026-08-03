@@ -96,13 +96,37 @@ def test_agente_formato_menu_mandamiento_placeholders(qapp, db):
     assert _tab_titles(window).count("Revisar Formato Mandamiento") == 1
 
 
-def test_abogado_formato_menu_mandamientos_placeholder(qapp, db):
+def test_abogado_formato_menu_shows_mandamientos_capture_view(qapp, db):
     window = MainWindow(_make_abogado())
 
     window._show_mandamientos_tab()
-    assert "Mandamientos (próximamente)" in _tab_titles(window)
+    assert "Formato de Mandamientos (Abogado)" in _tab_titles(window)
     window._show_mandamientos_tab()
-    assert _tab_titles(window).count("Mandamientos (próximamente)") == 1
+    assert _tab_titles(window).count("Formato de Mandamientos (Abogado)") == 1
+
+
+def test_agente_formato_menu_adds_and_reuses_generar_mandamiento_tab(qapp, db):
+    window = MainWindow(_make_agente())
+
+    window._show_generar_mandamiento_tab()
+    assert "Generar Formato Mandamiento" in _tab_titles(window)
+    assert window.tabs.currentWidget() is window._formato_widgets["generar_mandamiento"]
+
+    window.tabs.setCurrentIndex(0)
+    window._show_generar_mandamiento_tab()
+    assert _tab_titles(window).count("Generar Formato Mandamiento") == 1
+
+
+def test_agente_formato_menu_adds_and_reuses_revisar_mandamiento_tab(qapp, db):
+    window = MainWindow(_make_agente())
+
+    window._show_revisar_mandamiento_tab()
+    assert "Revisar Formato Mandamiento" in _tab_titles(window)
+    assert window.tabs.currentWidget() is window._formato_widgets["revisar_mandamiento"]
+
+    window.tabs.setCurrentIndex(0)
+    window._show_revisar_mandamiento_tab()
+    assert _tab_titles(window).count("Revisar Formato Mandamiento") == 1
 
 
 def test_abogado_formato_menu_shows_capture_view(qapp, db):
@@ -120,6 +144,40 @@ def test_otros_menu_shows_datos_cuenta_tab(qapp, db):
     assert "Datos de cuenta" in _tab_titles(window)
     window._show_datos_cuenta_tab()
     assert _tab_titles(window).count("Datos de cuenta") == 1
+
+
+def test_otros_menu_offers_colores_to_agente_only(qapp, db):
+    agente_window = MainWindow(_make_agente())
+    agente_menu_titles = [
+        action.text()
+        for menu_action in agente_window.menuBar().actions()
+        if menu_action.text() == "Otros"
+        for action in menu_action.menu().actions()
+    ]
+    assert "Colores" in agente_menu_titles
+
+    abogado_window = MainWindow(_make_abogado("abogado2"))
+    abogado_menu_titles = [
+        action.text()
+        for menu_action in abogado_window.menuBar().actions()
+        if menu_action.text() == "Otros"
+        for action in menu_action.menu().actions()
+    ]
+    assert "Colores" not in abogado_menu_titles
+
+
+def test_show_colores_tab_for_agente_is_interface_only(qapp, db):
+    window = MainWindow(_make_agente())
+
+    window._show_colores_tab()
+    assert "Colores" in _tab_titles(window)
+    widget = window._otros_widgets["colores"]
+    assert widget.allow_pdf is False
+    assert not hasattr(widget, "_pdf_status_label")
+
+    window.tabs.setCurrentIndex(0)
+    window._show_colores_tab()
+    assert _tab_titles(window).count("Colores") == 1
 
 
 def test_historico_menu_shows_and_reuses_tab(qapp, db):
@@ -142,6 +200,7 @@ def test_admin_keeps_direct_requerimientos_tab_plus_welcome(qapp, db):
         "Usuarios",
         "Solicitudes de reset",
         "Apariencia",
+        "Colores",
         "Datos de cuenta",
         "Trazabilidad",
     ]
@@ -212,12 +271,38 @@ def test_continuar_revision_solicitada_switches_to_revisar_tab_and_loads_import(
     )
 
     window = MainWindow(agente)
-    window._on_continuar_revision_solicitada(revision_import_id)
+    window._on_continuar_revision_solicitada("requerimiento", revision_import_id)
 
     # El título de la pestaña queda con el nombre del archivo abierto (ver
     # _on_revision_filename_changed), así que sólo se verifica el prefijo.
     assert any(title.startswith("Revisar Formato Requerimiento") for title in _tab_titles(window))
     widget = window._formato_widgets["revisar_formato"]
+    assert widget.revision_table.rowCount() == 1
+    assert window.tabs.currentWidget() is widget
+
+
+def test_continuar_revision_solicitada_mandamiento_switches_to_revisar_mandamiento_tab(qapp, db):
+    from app.db.repositories import revisiones_mandamiento as revisiones_mandamiento_repo
+
+    agente = _make_agente()
+    revision_import_id = revisiones_mandamiento_repo.create_revision_import(
+        agente_id=agente.id, source_filename="lote1.mcdiep", abogado_nombre=None, abogado_id=None,
+    )
+    revisiones_mandamiento_repo.add_revision_rows(
+        agente_id=agente.id, revision_import_id=revision_import_id, source_filename="lote1.mcdiep",
+        abogado_nombre=None, abogado_id=None,
+        rows=[{
+            "folio": "F1", "cta_predial": None, "contribuyente": None,
+            "fecha_citatorio": None, "recibe_citatorio": None, "recibe_citatorio_nombre": None,
+            "fecha_notificacion": None, "quien_recibe": None, "quien_recibe_nombre": None,
+        }],
+    )
+
+    window = MainWindow(agente)
+    window._on_continuar_revision_solicitada("mandamiento", revision_import_id)
+
+    assert any(title.startswith("Revisar Formato Mandamiento") for title in _tab_titles(window))
+    widget = window._formato_widgets["revisar_mandamiento"]
     assert widget.revision_table.rowCount() == 1
     assert window.tabs.currentWidget() is widget
 
@@ -253,5 +338,9 @@ def test_super_can_open_agente_simulation_via_choose_dialog(qapp, db):
     titles = _tab_titles(window)
     assert f"Viendo como: {agente.full_name} — Generar Formato Requerimiento" in titles
     assert f"Viendo como: {agente.full_name} — Revisar Formato Requerimiento" in titles
+    assert f"Viendo como: {agente.full_name} — Generar Formato Mandamiento" in titles
+    assert f"Viendo como: {agente.full_name} — Revisar Formato Mandamiento" in titles
     assert f"generar:{agente.id}" in window._viendo_como_widgets
     assert f"revisar:{agente.id}" in window._viendo_como_widgets
+    assert f"generar_mandamiento:{agente.id}" in window._viendo_como_widgets
+    assert f"revisar_mandamiento:{agente.id}" in window._viendo_como_widgets

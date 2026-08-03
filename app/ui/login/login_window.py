@@ -31,7 +31,7 @@ from app.ui.login.forgot_password_dialog import ForgotPasswordDialog
 from app.ui.login.import_update_dialog import ImportUpdateDialog
 from app.ui.login.recovery_code_dialog import RecoveryCodeRecoveryDialog
 from app.ui.widgets.background_widget import BackgroundWidget
-from app.ui.widgets.styles import login_background_path
+from app.ui.widgets.styles import apply_base_style, login_background_path
 
 WELCOME_TITLE = (
     "Bienvenido/a al Sistema de Control del Proceso Administrativo de "
@@ -52,6 +52,7 @@ class LoginWindow(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        apply_base_style(self)
         self.setWindowTitle(window_title("Iniciar sesión"))
         self.setMinimumSize(480, 420)
         self._user: users_repo.User | None = None
@@ -169,6 +170,7 @@ class LoginWindow(QDialog):
         layout.addWidget(self.password_input)
 
         login_btn = QPushButton("Iniciar sesión")
+        login_btn.setProperty("role", "primary")
         login_btn.clicked.connect(self._on_login_password)
         layout.addWidget(login_btn)
 
@@ -215,6 +217,7 @@ class LoginWindow(QDialog):
         layout.addWidget(self.cert_password_input)
 
         login_btn = QPushButton("Iniciar sesión")
+        login_btn.setProperty("role", "primary")
         login_btn.clicked.connect(self._on_login_cert)
         layout.addWidget(login_btn)
 

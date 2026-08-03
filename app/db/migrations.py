@@ -8,7 +8,7 @@ from pathlib import Path
 from app.db.connection import get_connection
 
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
-CURRENT_VERSION = 10
+CURRENT_VERSION = 11
 
 # Migraciones incrementales para bases de datos creadas con una versión anterior
 # del esquema. schema.sql ya crea las tablas nuevas "desde cero" con todo esto
@@ -144,6 +144,88 @@ _MIGRATIONS: dict[int, str | list[str]] = {
             FROM requerimiento_rows""",
         "DROP TABLE requerimiento_rows",
         "ALTER TABLE requerimiento_rows_v10 RENAME TO requerimiento_rows",
+    ],
+    11: [
+        # Módulo de Mandamiento: mismo flujo que Requerimiento, en tablas
+        # separadas (su Excel de origen no trae DOMICILIO -- sólo columnas
+        # B, C y D -- y mezclar los lotes rompería la llave foránea de
+        # imported_files.batch_id hacia requerimiento_batches).
+        """CREATE TABLE IF NOT EXISTS mandamiento_batches (
+            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+            abogado_id            INTEGER NOT NULL REFERENCES users(id),
+            agente_id             INTEGER NOT NULL REFERENCES users(id),
+            status                TEXT NOT NULL DEFAULT 'PENDIENTE_ABOGADO'
+                                  CHECK (status IN ('PENDIENTE_ABOGADO', 'CAPTURADO', 'EXPORTADO')),
+            exported_agente_path  TEXT,
+            exported_abogado_path TEXT,
+            finalizado            INTEGER NOT NULL DEFAULT 0,
+            agente_export_uuid    TEXT,
+            agente_export_hash    TEXT,
+            abogado_export_uuid   TEXT,
+            abogado_export_hash   TEXT,
+            created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        """CREATE TABLE IF NOT EXISTS mandamiento_rows (
+            id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+            batch_id                 INTEGER NOT NULL REFERENCES mandamiento_batches(id),
+            folio                    TEXT,
+            cta_predial              TEXT,
+            contribuyente            TEXT,
+            fecha_citatorio          TEXT,
+            recibe_citatorio         TEXT CHECK (recibe_citatorio IN ('EN PUERTA', 'NOMBRE', 'HOJA DE CAMPO')),
+            recibe_citatorio_nombre  TEXT,
+            fecha_notificacion       TEXT,
+            quien_recibe             TEXT CHECK (quien_recibe IN ('EN PUERTA', 'NOMBRE', 'HOJA DE CAMPO')),
+            quien_recibe_nombre      TEXT,
+            captured_at              TEXT
+        )""",
+        """CREATE TABLE IF NOT EXISTS mandamiento_imported_files (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            original_filename TEXT NOT NULL,
+            agente_id         INTEGER NOT NULL REFERENCES users(id),
+            abogado_id        INTEGER NOT NULL REFERENCES users(id),
+            batch_id          INTEGER REFERENCES mandamiento_batches(id),
+            row_count         INTEGER NOT NULL DEFAULT 0,
+            imported_at       TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        """CREATE TABLE IF NOT EXISTS mandamiento_revision_imports (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            agente_id         INTEGER NOT NULL REFERENCES users(id),
+            source_filename   TEXT NOT NULL,
+            abogado_nombre    TEXT,
+            abogado_id        INTEGER REFERENCES users(id),
+            status            TEXT NOT NULL DEFAULT 'EN_REVISION'
+                              CHECK (status IN ('EN_REVISION', 'PENDIENTE_REPORTE', 'REPORTE_ENVIADO')),
+            status_changed_at TEXT NOT NULL DEFAULT (datetime('now')),
+            imported_at       TEXT NOT NULL DEFAULT (datetime('now')),
+            imported_uuid     TEXT,
+            imported_hash     TEXT
+        )""",
+        """CREATE TABLE IF NOT EXISTS mandamiento_revision_rows (
+            id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+            agente_id                INTEGER NOT NULL REFERENCES users(id),
+            revision_import_id       INTEGER REFERENCES mandamiento_revision_imports(id),
+            source_filename          TEXT NOT NULL,
+            abogado_nombre           TEXT,
+            abogado_id               INTEGER REFERENCES users(id),
+            folio                    TEXT,
+            cta_predial              TEXT,
+            contribuyente            TEXT,
+            fecha_citatorio          TEXT,
+            recibe_citatorio         TEXT,
+            recibe_citatorio_nombre  TEXT,
+            fecha_notificacion       TEXT,
+            quien_recibe             TEXT,
+            quien_recibe_nombre      TEXT,
+            procede                  TEXT CHECK (procede IN ('PROCEDE', 'NO PROCEDE')),
+            imported_at              TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_mandamiento_imported_files_agente ON mandamiento_imported_files(agente_id, original_filename)",
+        "CREATE INDEX IF NOT EXISTS idx_mandamiento_batches_abogado ON mandamiento_batches(abogado_id)",
+        "CREATE INDEX IF NOT EXISTS idx_mandamiento_rows_batch ON mandamiento_rows(batch_id)",
+        "CREATE INDEX IF NOT EXISTS idx_mandamiento_revision_rows_agente ON mandamiento_revision_rows(agente_id)",
+        "CREATE INDEX IF NOT EXISTS idx_mandamiento_revision_imports_agente ON mandamiento_revision_imports(agente_id)",
     ],
 }
 

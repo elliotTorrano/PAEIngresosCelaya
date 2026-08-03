@@ -1,8 +1,10 @@
-"""Abogado: importa el archivo del Agente del PAE, captura el citatorio y exporta.
+"""Abogado: importa el archivo del Agente del PAE, captura el citatorio y
+exporta, para Mandamiento. Mismo flujo que
+app/ui/abogado/requerimientos_capture_view.py, sin la columna DOMICILIO.
 
-El Abogado nunca edita FOLIO/CTA PREDIAL/CONTRIBUYENTE/DOMICILIO (se muestran de
-sólo lectura); captura dos pares de datos, cada uno con su propia fecha y
-"quién recibe": la fecha/quién del citatorio en sí, y la fecha/quién de la
+El Abogado nunca edita FOLIO/CTA PREDIAL/CONTRIBUYENTE (se muestran de sólo
+lectura); captura dos pares de datos, cada uno con su propia fecha y "quién
+recibe": la fecha/quién del citatorio en sí, y la fecha/quién de la
 notificación de ese citatorio (dos eventos distintos).
 """
 
@@ -37,22 +39,22 @@ from app.config import (
     QUIEN_RECIBE_HOJA_CAMPO,
     QUIEN_RECIBE_NOMBRE,
 )
-from app.db.repositories import requerimientos as req_repo
+from app.db.repositories import mandamientos as mand_repo
 from app.db.repositories import users as users_repo
 from app.excel_io import mcdiep_format
-from app.excel_io.requerimientos_export import build_abogado_envelope
-from app.excel_io.requerimientos_import import McdiepVerificationError, parse_agente_export_file
-from app.pdf_io import requerimientos_pdf
+from app.excel_io.mandamientos_export import build_abogado_envelope
+from app.excel_io.mandamientos_import import McdiepVerificationError, parse_agente_export_file
+from app.pdf_io import mandamientos_pdf
 from app.utils.dates import format_local_datetime
 from app.utils.paths import exports_dir
 
 (
-    COL_FOLIO, COL_CTA, COL_CONTRIB, COL_DOM,
+    COL_FOLIO, COL_CTA, COL_CONTRIB,
     COL_FECHA_CIT, COL_RECIBE_CIT, COL_NOMBRE_CIT,
     COL_FECHA_NOT, COL_QUIEN_NOT, COL_NOMBRE_NOT,
-) = range(10)
+) = range(9)
 HEADERS = [
-    "FOLIO", "CTA PREDIAL", "CONTRIBUYENTE", "DOMICILIO",
+    "FOLIO", "CTA PREDIAL", "CONTRIBUYENTE",
     "Fecha de citatorio", "Recibe citatorio", "Nombre",
     "Fecha de notificación", "Quién recibe", "Nombre",
 ]
@@ -77,14 +79,14 @@ def _category_for_batch(batch) -> str:
     return DOC_TYPE_PENDIENTE
 
 
-class RequerimientosCaptureView(QWidget):
+class MandamientosCaptureView(QWidget):
     def __init__(self, abogado_user: users_repo.User, parent=None, simulate: bool = False):
         super().__init__(parent)
         self.abogado_user = abogado_user
         self.simulate = simulate
         self._current_batch_id: int | None = None
         self._current_batch_finalizado: bool = False
-        self._rows: list[req_repo.RequerimientoRow] = []
+        self._rows: list[mand_repo.MandamientoRow] = []
 
         layout = QVBoxLayout(self)
 
@@ -136,10 +138,7 @@ class RequerimientosCaptureView(QWidget):
 
         # Pantalla previa: primero se elige QUÉ TIPO de documento se busca
         # (Pendiente/Exportado/Finalizado); sólo entonces se listan los lotes
-        # de ese tipo. "Abrir" carga el seleccionado en la tabla de abajo;
-        # "Limpiar" vacía la lista y cierra lo que estuviera abierto. Cambiar
-        # el tipo directamente también vacía y vuelve a poblar la lista (ver
-        # `_on_tipo_changed`), nunca mezcla tipos distintos en pantalla.
+        # de ese tipo.
         selector_row = QHBoxLayout()
         selector_row.addWidget(QLabel("Tipo de documento:"))
         self.tipo_combo = QComboBox()
@@ -189,7 +188,7 @@ class RequerimientosCaptureView(QWidget):
     def _refresh_available_list(self) -> None:
         self.available_list.clear()
         category = self.tipo_combo.currentData()
-        for batch in req_repo.list_batches_for_abogado(self.abogado_user.id):
+        for batch in mand_repo.list_batches_for_abogado(self.abogado_user.id):
             if _category_for_batch(batch) != category:
                 continue
             label = f"Lote #{batch['id']} — {batch['status']} — {format_local_datetime(batch['created_at'])}"
@@ -198,8 +197,6 @@ class RequerimientosCaptureView(QWidget):
             self.available_list.addItem(item)
 
     def _on_tipo_changed(self) -> None:
-        # "Si se cambia directamente el tipo de documento, borre los archivos
-        # disponibles": no se conserva la lista del tipo anterior.
         self._refresh_available_list()
 
     def _on_open_selected_batch(self) -> None:
@@ -223,8 +220,8 @@ class RequerimientosCaptureView(QWidget):
 
     def _load_batch(self, batch_id: int) -> None:
         self._current_batch_id = batch_id
-        self._rows = req_repo.list_rows(batch_id)
-        batch = req_repo.get_batch(batch_id)
+        self._rows = mand_repo.list_rows(batch_id)
+        batch = mand_repo.get_batch(batch_id)
         self._current_batch_finalizado = bool(batch["finalizado"]) if batch else False
         self.finalize_btn.setVisible(not self._current_batch_finalizado)
         self.edit_btn.setVisible(self._current_batch_finalizado)
@@ -273,13 +270,13 @@ class RequerimientosCaptureView(QWidget):
             return
 
         agente = result.agente
-        batch_id = req_repo.create_batch(abogado_id=self.abogado_user.id, agente_id=agente.id)
-        req_repo.add_rows(batch_id, result.rows)
-        req_repo.record_imported_file(
+        batch_id = mand_repo.create_batch(abogado_id=self.abogado_user.id, agente_id=agente.id)
+        mand_repo.add_rows(batch_id, result.rows)
+        mand_repo.record_imported_file(
             original_filename=Path(file_path).name, agente_id=agente.id, abogado_id=self.abogado_user.id,
             batch_id=batch_id, row_count=len(result.rows),
         )
-        req_repo.set_batch_export_path(
+        mand_repo.set_batch_export_path(
             batch_id, agente_uuid=result.document_uuid, agente_hash=result.file_hash,
         )
         self.tipo_combo.setCurrentIndex(self.tipo_combo.findData(DOC_TYPE_PENDIENTE))
@@ -315,7 +312,6 @@ class RequerimientosCaptureView(QWidget):
                 self.table.setItem(r, COL_FOLIO, QTableWidgetItem(row.folio or ""))
                 self.table.setItem(r, COL_CTA, QTableWidgetItem(row.cta_predial or ""))
                 self.table.setItem(r, COL_CONTRIB, QTableWidgetItem(row.contribuyente or ""))
-                self.table.setItem(r, COL_DOM, QTableWidgetItem(row.domicilio or ""))
 
                 self._build_capture_trio(
                     r, row.id,
@@ -400,7 +396,7 @@ class RequerimientosCaptureView(QWidget):
         )
 
         if not self.simulate:
-            req_repo.update_row_capture(
+            mand_repo.update_row_capture(
                 row_id,
                 fecha_citatorio=fecha_citatorio,
                 recibe_citatorio=recibe_citatorio,
@@ -462,7 +458,7 @@ class RequerimientosCaptureView(QWidget):
 
         self.table.scrollToItem(self.table.item(missing_index, COL_FOLIO))
         self.table.selectRow(missing_index)
-        self._flash_highlight(missing_index, (COL_FOLIO, COL_CTA, COL_CONTRIB, COL_DOM))
+        self._flash_highlight(missing_index, (COL_FOLIO, COL_CTA, COL_CONTRIB))
 
     def _on_search(self) -> None:
         text = self.search_input.text().strip().lower()
@@ -476,7 +472,7 @@ class RequerimientosCaptureView(QWidget):
             if text in value.lower():
                 self.table.scrollToItem(self.table.item(row_index, col))
                 self.table.selectRow(row_index)
-                self._flash_highlight(row_index, (COL_FOLIO, COL_CTA, COL_CONTRIB, COL_DOM))
+                self._flash_highlight(row_index, (COL_FOLIO, COL_CTA, COL_CONTRIB))
                 return
 
         QMessageBox.information(self, "Sin resultados", "No se encontró ninguna fila que coincida con la búsqueda.")
@@ -501,7 +497,7 @@ class RequerimientosCaptureView(QWidget):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        req_repo.set_batch_finalizado(self._current_batch_id, True)
+        mand_repo.set_batch_finalizado(self._current_batch_id, True)
         self._current_batch_finalizado = True
         self.finalize_btn.setVisible(False)
         self.edit_btn.setVisible(True)
@@ -520,9 +516,8 @@ class RequerimientosCaptureView(QWidget):
 
         # Si el lote YA se exportó antes, desbloquearlo para editar no
         # actualiza solo el archivo que ya se entregó -- hay que avisarlo
-        # explícitamente antes de permitirlo (a diferencia de un lote que
-        # sólo se finalizó manualmente sin haberse exportado todavía).
-        batch = req_repo.get_batch(self._current_batch_id)
+        # explícitamente antes de permitirlo.
+        batch = mand_repo.get_batch(self._current_batch_id)
         if batch is not None and batch["status"] == BATCH_STATUS_EXPORTADO:
             proceed = QMessageBox.warning(
                 self, "Lote ya exportado",
@@ -536,7 +531,7 @@ class RequerimientosCaptureView(QWidget):
             if proceed != QMessageBox.StandardButton.Yes:
                 return
 
-        req_repo.set_batch_finalizado(self._current_batch_id, False)
+        mand_repo.set_batch_finalizado(self._current_batch_id, False)
         self._current_batch_finalizado = False
         self.finalize_btn.setVisible(True)
         self.edit_btn.setVisible(False)
@@ -586,14 +581,14 @@ class RequerimientosCaptureView(QWidget):
         if choice == "cancel":
             return
 
-        batch = req_repo.get_batch(self._current_batch_id)
+        batch = mand_repo.get_batch(self._current_batch_id)
         agente = users_repo.get_by_id(batch["agente_id"])
 
-        document_uuid = requerimientos_pdf.new_document_uuid()
+        document_uuid = mandamientos_pdf.new_document_uuid()
         envelope = build_abogado_envelope(rows_to_export, document_uuid=document_uuid)
         mcdiep_bytes = mcdiep_format.envelope_bytes(envelope)
-        identity = requerimientos_pdf.compute_identity(mcdiep_bytes, document_uuid=document_uuid)
-        filename = requerimientos_pdf.suggested_filename(
+        identity = mandamientos_pdf.compute_identity(mcdiep_bytes, document_uuid=document_uuid)
+        filename = mandamientos_pdf.suggested_filename(
             agente_nombre=agente.full_name, abogado_nombre=self.abogado_user.full_name,
             identity=identity, extension=mcdiep_format.EXTENSION,
         )
@@ -614,13 +609,13 @@ class RequerimientosCaptureView(QWidget):
                 return
 
         output_path.write_bytes(mcdiep_bytes)
-        req_repo.set_batch_export_path(
+        mand_repo.set_batch_export_path(
             self._current_batch_id, abogado_path=str(output_path),
             abogado_uuid=identity.uuid, abogado_hash=identity.file_hash,
         )
-        req_repo.set_batch_status(self._current_batch_id, BATCH_STATUS_EXPORTADO)
+        mand_repo.set_batch_status(self._current_batch_id, BATCH_STATUS_EXPORTADO)
         pdf_path = output_path.with_suffix(".pdf")
-        requerimientos_pdf.export_abogado_pdf(
+        mandamientos_pdf.export_abogado_pdf(
             pdf_path, agente=agente, abogado=self.abogado_user, rows=rows_to_export,
             filename=output_path.name, identity=identity,
         )
@@ -628,7 +623,7 @@ class RequerimientosCaptureView(QWidget):
         # Los datos ya exportados quedan bloqueados de inmediato -- igual que
         # "Finalizar captura" -- para que no se editen por accidente después
         # de entregados; "Editar captura" los desbloquea (con advertencia).
-        req_repo.set_batch_finalizado(self._current_batch_id, True)
+        mand_repo.set_batch_finalizado(self._current_batch_id, True)
         self._current_batch_finalizado = True
         self.finalize_btn.setVisible(False)
         self.edit_btn.setVisible(True)
@@ -641,7 +636,7 @@ class RequerimientosCaptureView(QWidget):
             if agente.email:
                 open_email_client(
                     to_email=agente.email,
-                    subject="Entrega de Requerimientos capturados",
+                    subject="Entrega de Mandamientos capturados",
                     body=f"Se adjunta la captura del lote #{self._current_batch_id}.",
                     attachment_path=output_path,
                 )

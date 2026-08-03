@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from app.auth import recovery
 from app.config import ADMIN_NOTIFICATION_EMAIL_SUBJECT, RESET_REASON_LABELS, ROLE_ADMINISTRADOR, window_title
 from app.db.repositories import users as users_repo
+from app.ui.widgets.styles import apply_base_style
 from app.utils.paths import reset_requests_dir
 
 
@@ -27,6 +28,7 @@ class ForgotPasswordDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        apply_base_style(self)
         self.setWindowTitle(window_title("Olvidé mi contraseña o certificado"))
         self.setMinimumWidth(420)
 

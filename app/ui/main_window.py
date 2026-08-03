@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QDialog, QLabel, QMainWindow, QMessageBox, QTabBar, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QMainWindow, QMessageBox, QTabBar, QTabWidget, QVBoxLayout, QWidget
 
 from app.__version__ import __version__
 from app.auth import session
@@ -85,6 +85,7 @@ class MainWindow(QMainWindow):
         if role in (ROLE_ADMINISTRADOR, ROLE_SUPERUSUARIO):
             from app.ui.admin.account_settings_view import AccountSettingsView
             from app.ui.admin.audit_view import AuditView
+            from app.ui.admin.color_settings_view import ColorSettingsView
             from app.ui.admin.user_management_view import UserManagementView
             from app.ui.admin.appearance_settings_view import AppearanceSettingsView
             from app.ui.admin.reset_requests_view import ResetRequestsView
@@ -92,6 +93,7 @@ class MainWindow(QMainWindow):
             self._add_permanent_tab(UserManagementView(self.user), "Usuarios")
             self._add_permanent_tab(ResetRequestsView(self.user), "Solicitudes de reset")
             self._add_permanent_tab(AppearanceSettingsView(self.user), "Apariencia")
+            self._add_permanent_tab(ColorSettingsView(self.user), "Colores")
             self._add_permanent_tab(AccountSettingsView(self.user), "Datos de cuenta")
             self._add_permanent_tab(AuditView(self.user), "Trazabilidad")
 
@@ -123,24 +125,22 @@ class MainWindow(QMainWindow):
             # Dos pantallas separadas (no una sola con todo apilado) para que
             # generar el formato para el Abogado y revisar lo que el Abogado
             # devolvió no se interrumpan visualmente entre sí. Cada una, a su
-            # vez, se agrupa por tipo de documento (Requerimiento/Mandamiento)
-            # -- Mandamiento todavía no está desarrollado, pero el menú y la
-            # pestaña ya quedan preparados para cuando se implemente.
+            # vez, se agrupa por tipo de documento (Requerimiento/Mandamiento).
             generar_menu = menu.addMenu("Generar Formato")
             generar_req_action = generar_menu.addAction("Requerimiento")
             generar_req_action.triggered.connect(self._show_generar_formato_tab)
-            generar_mand_action = generar_menu.addAction("Mandamiento (Próximamente)")
+            generar_mand_action = generar_menu.addAction("Mandamiento")
             generar_mand_action.triggered.connect(self._show_generar_mandamiento_tab)
 
             revisar_menu = menu.addMenu("Revisar Formato")
             revisar_req_action = revisar_menu.addAction("Requerimiento")
             revisar_req_action.triggered.connect(self._show_revisar_formato_tab)
-            revisar_mand_action = revisar_menu.addAction("Mandamiento (Próximamente)")
+            revisar_mand_action = revisar_menu.addAction("Mandamiento")
             revisar_mand_action.triggered.connect(self._show_revisar_mandamiento_tab)
         else:
             req_action = menu.addAction("Formato de Requerimientos")
             req_action.triggered.connect(self._show_requerimientos_tab)
-            mandamientos_action = menu.addAction("Mandamientos (próximamente)")
+            mandamientos_action = menu.addAction("Formato de Mandamientos")
             mandamientos_action.triggered.connect(self._show_mandamientos_tab)
 
     def _show_requerimientos_tab(self) -> None:
@@ -189,25 +189,38 @@ class MainWindow(QMainWindow):
         self.tabs.setTabText(index, f"{base_title} — {filename}" if filename else base_title)
 
     def _show_generar_mandamiento_tab(self) -> None:
-        self._show_placeholder_tab("generar_mandamiento", TAB_GENERAR_MANDAMIENTO)
+        widget = self._formato_widgets.get("generar_mandamiento")
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            from app.ui.agente.mandamientos_generar_view import MandamientosGenerarView
+
+            widget = MandamientosGenerarView(self.user)
+            self.tabs.addTab(widget, TAB_GENERAR_MANDAMIENTO)
+            self._formato_widgets["generar_mandamiento"] = widget
+        self.tabs.setCurrentWidget(widget)
 
     def _show_revisar_mandamiento_tab(self) -> None:
-        self._show_placeholder_tab("revisar_mandamiento", TAB_REVISAR_MANDAMIENTO)
+        widget = self._formato_widgets.get("revisar_mandamiento")
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            from app.ui.agente.mandamientos_revision_view import MandamientosRevisionView
+
+            widget = MandamientosRevisionView(self.user)
+            widget.archivo_cambiado.connect(
+                lambda filename, w=widget: self._on_revision_filename_changed(w, filename)
+            )
+            self.tabs.addTab(widget, TAB_REVISAR_MANDAMIENTO)
+            self._formato_widgets["revisar_mandamiento"] = widget
+        self.tabs.setCurrentWidget(widget)
 
     def _show_mandamientos_tab(self) -> None:
-        self._show_placeholder_tab("mandamientos", "Mandamientos (próximamente)")
-
-    def _show_placeholder_tab(self, key: str, title: str) -> None:
-        widget = self._formato_widgets.get(key)
+        """Sólo para el Abogado -- el Agente del PAE usa las pantallas
+        separadas: ver `_show_generar_mandamiento_tab` y `_show_revisar_mandamiento_tab`."""
+        widget = self._formato_widgets.get("mandamientos")
         if widget is None or self.tabs.indexOf(widget) == -1:
-            widget = QLabel(
-                "El Formato de Mandamientos y los Reportes de Requerimientos/Mandamientos "
-                "se agregarán en una siguiente fase del programa."
-            )
-            widget.setWordWrap(True)
-            widget.setContentsMargins(16, 16, 16, 16)
-            self.tabs.addTab(widget, title)
-            self._formato_widgets[key] = widget
+            from app.ui.abogado.mandamientos_capture_view import MandamientosCaptureView
+
+            widget = MandamientosCaptureView(self.user)
+            self.tabs.addTab(widget, "Formato de Mandamientos (Abogado)")
+            self._formato_widgets["mandamientos"] = widget
         self.tabs.setCurrentWidget(widget)
 
     # --- Menú "Seguimiento" (sólo Agente del PAE) -----------------------------------
@@ -228,9 +241,13 @@ class MainWindow(QMainWindow):
             self._otros_widgets["seguimiento"] = widget
         self.tabs.setCurrentWidget(widget)
 
-    def _on_continuar_revision_solicitada(self, revision_import_id: int) -> None:
-        self._show_revisar_formato_tab()
-        self._formato_widgets["revisar_formato"]._load_import(revision_import_id)
+    def _on_continuar_revision_solicitada(self, tipo: str, revision_import_id: int) -> None:
+        if tipo == "mandamiento":
+            self._show_revisar_mandamiento_tab()
+            self._formato_widgets["revisar_mandamiento"]._load_import(revision_import_id)
+        else:
+            self._show_revisar_formato_tab()
+            self._formato_widgets["revisar_formato"]._load_import(revision_import_id)
 
     # --- Menú "Otros" (Agente del PAE / Abogado) ------------------------------------
 
@@ -238,6 +255,14 @@ class MainWindow(QMainWindow):
         menu = self.menuBar().addMenu("Otros")
         action = menu.addAction("Datos de cuenta")
         action.triggered.connect(self._show_datos_cuenta_tab)
+
+        # Sólo el Agente del PAE puede ajustar SU interfaz a su gusto -- el
+        # Abogado siempre se queda con lo que haya quedado guardado, sin
+        # poder cambiarlo. Ninguno de los dos puede tocar el color del PDF
+        # (eso sigue siendo exclusivo de Administrador/Súper-usuario).
+        if self.user.role == ROLE_AGENTE_PAE:
+            colores_action = menu.addAction("Colores")
+            colores_action.triggered.connect(self._show_colores_tab)
 
     def _show_datos_cuenta_tab(self) -> None:
         widget = self._otros_widgets.get("datos_cuenta")
@@ -247,6 +272,16 @@ class MainWindow(QMainWindow):
             widget = SimpleAccountView(self.user)
             self.tabs.addTab(widget, "Datos de cuenta")
             self._otros_widgets["datos_cuenta"] = widget
+        self.tabs.setCurrentWidget(widget)
+
+    def _show_colores_tab(self) -> None:
+        widget = self._otros_widgets.get("colores")
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            from app.ui.admin.color_settings_view import ColorSettingsView
+
+            widget = ColorSettingsView(self.user, allow_pdf=False)
+            self.tabs.addTab(widget, "Colores")
+            self._otros_widgets["colores"] = widget
         self.tabs.setCurrentWidget(widget)
 
     # --- Menú "Histórico" (Agente del PAE / Abogado) --------------------------------
@@ -282,6 +317,8 @@ class MainWindow(QMainWindow):
 
         target = dialog.selected_user
         if target.role == ROLE_AGENTE_PAE:
+            from app.ui.agente.mandamientos_generar_view import MandamientosGenerarView
+            from app.ui.agente.mandamientos_revision_view import MandamientosRevisionView
             from app.ui.agente.requerimientos_generar_view import RequerimientosGenerarView
             from app.ui.agente.requerimientos_revision_view import RequerimientosRevisionView
 
@@ -306,8 +343,30 @@ class MainWindow(QMainWindow):
                 )
                 self._viendo_como_widgets[revisar_key] = revisar_widget
 
+            generar_mand_key = f"generar_mandamiento:{target.id}"
+            generar_mand_widget = self._viendo_como_widgets.get(generar_mand_key)
+            if generar_mand_widget is None or self.tabs.indexOf(generar_mand_widget) == -1:
+                generar_mand_widget = MandamientosGenerarView(target, simulate=True)
+                self.tabs.addTab(
+                    generar_mand_widget, f"Viendo como: {target.full_name} — {TAB_GENERAR_MANDAMIENTO}"
+                )
+                self._viendo_como_widgets[generar_mand_key] = generar_mand_widget
+
+            revisar_mand_key = f"revisar_mandamiento:{target.id}"
+            revisar_mand_widget = self._viendo_como_widgets.get(revisar_mand_key)
+            if revisar_mand_widget is None or self.tabs.indexOf(revisar_mand_widget) == -1:
+                revisar_mand_widget = MandamientosRevisionView(target, simulate=True)
+                revisar_mand_widget.archivo_cambiado.connect(
+                    lambda filename, w=revisar_mand_widget: self._on_revision_filename_changed(w, filename)
+                )
+                self.tabs.addTab(
+                    revisar_mand_widget, f"Viendo como: {target.full_name} — {TAB_REVISAR_MANDAMIENTO}"
+                )
+                self._viendo_como_widgets[revisar_mand_key] = revisar_mand_widget
+
             self.tabs.setCurrentWidget(generar_widget)
         else:
+            from app.ui.abogado.mandamientos_capture_view import MandamientosCaptureView
             from app.ui.abogado.requerimientos_capture_view import RequerimientosCaptureView
 
             key = f"abogado:{target.id}"
@@ -316,6 +375,14 @@ class MainWindow(QMainWindow):
                 widget = RequerimientosCaptureView(target, simulate=True)
                 self.tabs.addTab(widget, f"Viendo como: {target.full_name}")
                 self._viendo_como_widgets[key] = widget
+
+            mand_key = f"abogado_mandamiento:{target.id}"
+            mand_widget = self._viendo_como_widgets.get(mand_key)
+            if mand_widget is None or self.tabs.indexOf(mand_widget) == -1:
+                mand_widget = MandamientosCaptureView(target, simulate=True)
+                self.tabs.addTab(mand_widget, f"Viendo como: {target.full_name} — Mandamientos")
+                self._viendo_como_widgets[mand_key] = mand_widget
+
             self.tabs.setCurrentWidget(widget)
 
     def _on_logout(self) -> None:

@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.21.2"
+__version__ = "0.26.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -226,4 +226,57 @@ VERSION_NOTES = {
               "ya está en español, fijo en el código). Sin cambios de "
               "funcionalidad -- verificado que el sello con QR de los PDF sigue "
               "generándose y leyéndose igual.",
+    "0.22.0": "Nuevo módulo de Mandamiento, con el mismo flujo completo que "
+              "Requerimiento (generar/revisar del Agente del PAE, captura y "
+              "exportación del Abogado, seguimiento, histórico y trazabilidad), "
+              "en tablas y pantallas propias -- ya no es 'Próximamente'. La "
+              "única diferencia real: su Excel de origen sólo trae FOLIO, CTA "
+              "PREDIAL y CONTRIBUYENTE (columnas B, C y D) -- no hay DOMICILIO. "
+              "El PDF que lo acompaña lleva su propio encabezado institucional "
+              "('FORMATO: ENTREGA DE MANDAMIENTOS DE EJECUCIÓN').",
+    "0.23.0": "Nueva paleta institucional en toda la interfaz (verde #3A6B46 "
+              "como color de uso diario -- barras, pestaña activa, botones -- "
+              "guinda #8A1E2D para acciones críticas como Exportar/Firmar y "
+              "para los encabezados de tabla, ocre #A67242 en bordes y "
+              "separadores). Se extendió el estilo al login y a los diálogos "
+              "(certificado, contraseña, recuperación, enrolamiento), que "
+              "antes no tenían ningún estilo propio. El encabezado de la "
+              "tabla en el PDF exportado (Requerimiento y Mandamiento) ahora "
+              "es guinda en vez de azul, igual que en pantalla.",
+    "0.24.0": "Nueva pestaña 'Colores' (Administrador/Súper-usuario), junto a "
+              "'Apariencia': permite personalizar los 3 colores base del "
+              "programa (identidad, crítico, estructura) escribiendo el "
+              "código hexadecimal deseado. 'Aplicar (vista previa)' prueba "
+              "los colores de inmediato en TODAS las ventanas abiertas, sin "
+              "guardarlos -- se pierden al reiniciar el programa si no se "
+              "confirman. 'Restaurar predeterminados' vuelve en cualquier "
+              "momento a la combinación de fábrica (verde/guinda/ocre). "
+              "'Guardar como predeterminado' (con advertencia, porque cambia "
+              "el programa entero y no se puede deshacer) deja los colores "
+              "fijos de forma permanente -- se guardan en la base de datos, "
+              "así que se mantienen incluso después de actualizar el "
+              "programa. El encabezado de tabla del PDF también sigue el "
+              "color crítico guardado (nunca una vista previa sin confirmar).",
+    "0.25.0": "En la pestaña 'Colores', el botón único 'Guardar como "
+              "predeterminado' se separó en dos: 'Guardar cambios de "
+              "interfaz' (sólo pantalla -- menús, botones, pestañas) y "
+              "'Guardar cambios del PDF' (sólo el encabezado de los PDF "
+              "exportados), cada uno con su propia advertencia de "
+              "confirmación. Ahora se pueden ajustar los colores de "
+              "pantalla al gusto de quien usa el programa en esa "
+              "computadora sin arriesgar que un PDF oficial salga con un "
+              "color distinto al ya aprobado -- el color del PDF sólo "
+              "cambia cuando se guarda explícitamente con su propio botón. "
+              "Se agregó además una etiqueta que muestra el color "
+              "actualmente guardado para el encabezado del PDF.",
+    "0.26.0": "El Agente del PAE ya tiene su propio acceso a 'Colores' "
+              "(menú Otros): puede ajustar los colores de SU interfaz a su "
+              "gusto -- 'Restaurar predeterminados', 'Aplicar (vista "
+              "previa)' y 'Guardar cambios de interfaz', igual que "
+              "Administrador/Súper-usuario, pero sin el botón para cambiar "
+              "el color del PDF (eso sigue siendo exclusivo de "
+              "Administrador/Súper-usuario, porque el PDF es un documento "
+              "oficial). El Abogado no tiene acceso a 'Colores': siempre "
+              "ve la interfaz con lo que esté guardado en ese momento, sin "
+              "poder cambiarlo.",
 }

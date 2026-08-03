@@ -555,6 +555,51 @@ def test_migration_v9_adds_status_and_recomputes_fully_reviewed_imports(tmp_path
         connection_module._connection = None
 
 
+def test_migration_v11_creates_mandamiento_tables(tmp_path, monkeypatch):
+    db_file = tmp_path / "v10.db"
+    monkeypatch.setattr(connection_module, "db_path", lambda: db_file)
+    connection_module._connection = None
+
+    # Simula una base v10: sólo las tablas de Requerimiento, sin ninguna de
+    # las de Mandamiento todavía.
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+    conn.execute("INSERT INTO schema_version (version) VALUES (10)")
+    conn.execute(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL, full_name TEXT NOT NULL, email TEXT, auth_type TEXT NOT NULL,
+            password_hash TEXT, password_salt TEXT, cert_public_pem TEXT, cert_serial TEXT,
+            must_change_password INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        ensure_schema()
+
+        conn = connection_module.get_connection()
+        tables = {r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        for expected in (
+            "mandamiento_batches", "mandamiento_rows", "mandamiento_imported_files",
+            "mandamiento_revision_imports", "mandamiento_revision_rows",
+        ):
+            assert expected in tables
+
+        columns = [row["name"] for row in conn.execute("PRAGMA table_info(mandamiento_rows)")]
+        assert "domicilio" not in columns
+        assert "folio" in columns
+
+        version = conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+        assert version == CURRENT_VERSION
+    finally:
+        connection_module._connection = None
+
+
 def test_fresh_schema_already_has_column(tmp_path, monkeypatch):
     db_file = tmp_path / "fresh.db"
     monkeypatch.setattr(connection_module, "db_path", lambda: db_file)

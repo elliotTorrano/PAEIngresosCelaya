@@ -20,6 +20,7 @@ from app.auth.cert_auth import verify_certificate_file
 from app.auth.crypto_certs import load_bundle
 from app.config import window_title
 from app.db.repositories.users import User
+from app.ui.widgets.styles import apply_base_style
 
 
 class CertificateConfirmDialog(QDialog):
@@ -31,6 +32,7 @@ class CertificateConfirmDialog(QDialog):
 
     def __init__(self, user: User, parent=None, message: str | None = None):
         super().__init__(parent)
+        apply_base_style(self)
         self.user = user
         self._cert_path: str | None = None
         self.private_key = None
@@ -63,6 +65,7 @@ class CertificateConfirmDialog(QDialog):
         layout.addWidget(self.password_input)
 
         confirm_btn = QPushButton("Confirmar identidad")
+        confirm_btn.setProperty("role", "primary")
         confirm_btn.setDefault(True)
         confirm_btn.setAutoDefault(True)
         confirm_btn.clicked.connect(self._on_confirm)

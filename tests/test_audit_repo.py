@@ -1,6 +1,7 @@
 from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
 from app.db.connection import get_connection
 from app.db.repositories import audit as audit_repo
+from app.db.repositories import mandamientos as mand_repo
 from app.db.repositories import requerimientos as req_repo
 from app.db.repositories import users as users_repo
 
@@ -57,5 +58,45 @@ def test_list_batches_counts_captured_rows(db):
     assert len(batches) == 1
     assert batches[0]["agente_nombre"] == "Agente Uno"
     assert batches[0]["abogado_nombre"] == "Abogado Uno"
+    assert batches[0]["total_filas"] == 2
+    assert batches[0]["filas_capturadas"] == 1
+
+
+def test_list_mandamiento_imported_files_resolves_names(db):
+    agente, abogado = _make_agente_abogado()
+    batch_id = mand_repo.create_batch(abogado_id=abogado.id, agente_id=agente.id)
+    mand_repo.record_imported_file(
+        original_filename="lote1.xlsx", agente_id=agente.id, abogado_id=abogado.id,
+        batch_id=batch_id, row_count=3,
+    )
+
+    rows = audit_repo.list_mandamiento_imported_files(get_connection())
+
+    assert len(rows) == 1
+    assert rows[0]["original_filename"] == "lote1.xlsx"
+    assert rows[0]["agente_nombre"] == "Agente Uno"
+    assert rows[0]["abogado_nombre"] == "Abogado Uno"
+
+
+def test_list_mandamiento_batches_counts_captured_rows(db):
+    agente, abogado = _make_agente_abogado()
+    batch_id = mand_repo.create_batch(abogado_id=abogado.id, agente_id=agente.id)
+    mand_repo.add_rows(
+        batch_id,
+        [
+            {"folio": "F1", "cta_predial": "C1", "contribuyente": "X"},
+            {"folio": "F2", "cta_predial": "C2", "contribuyente": "Y"},
+        ],
+    )
+    rows = mand_repo.list_rows(batch_id)
+    mand_repo.update_row_capture(
+        rows[0].id,
+        fecha_citatorio="01/01/2026", recibe_citatorio="EN PUERTA", recibe_citatorio_nombre=None,
+        fecha_notificacion="01/01/2026", quien_recibe="EN PUERTA", quien_recibe_nombre=None,
+    )
+
+    batches = audit_repo.list_mandamiento_batches(get_connection())
+
+    assert len(batches) == 1
     assert batches[0]["total_filas"] == 2
     assert batches[0]["filas_capturadas"] == 1

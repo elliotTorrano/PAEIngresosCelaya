@@ -17,7 +17,7 @@ def _make_admin_with_cert(tmp_path):
     return users_repo.get_by_id(admin.id), recovery_code
 
 
-def test_display_dialog_shows_code_readonly(qapp):
+def test_display_dialog_shows_code_readonly(qapp, db):
     dialog = RecoveryCodeDisplayDialog("AAAA-BBBB-CCCC-DDDD")
     code_edit = dialog.findChild(QLineEdit)
     assert code_edit.text() == "AAAA-BBBB-CCCC-DDDD"

@@ -1,28 +1,57 @@
 /* Estilo base del Sistema PAE. El Administrador puede añadir color/imagen de fondo
    adicionales desde la pestaña "Apariencia", que se agregan a continuación de esto.
    Nota: esta hoja se aplica al centralWidget de cada ventana, nunca a la QMainWindow
-   directamente -- ver apply_window_background() en app/ui/widgets/styles.py. */
+   directamente -- ver apply_window_background() en app/ui/widgets/styles.py.
+
+   Esta es una PLANTILLA: los marcadores $identidad/$critico/$estructura (y sus
+   variantes _wash/_soft/_texto/_hover/_press/_on) se sustituyen en tiempo de
+   ejecución con los colores configurados desde la pestaña "Colores" del
+   Administrador (o los de fábrica si nunca se han cambiado) -- ver
+   app/ui/widgets/styles.py::_base_qss() / theme.py. */
+
+QMenuBar {
+    background-color: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid $estructura_soft;
+}
+
+QMenuBar::item:selected {
+    background-color: $identidad_wash;
+    color: $identidad_texto;
+}
+
+QMenu {
+    background-color: #ffffff;
+    border: 1px solid $estructura_soft;
+}
+
+QMenu::item:selected {
+    background-color: $identidad_wash;
+    color: $identidad_texto;
+}
 
 QTabWidget::pane {
     background-color: rgba(255, 255, 255, 0.88);
-    border: 1px solid #c9d2da;
+    border: 1px solid $estructura_soft;
 }
 
 QTabBar::tab {
-    background-color: rgba(255, 255, 255, 0.80);
+    background-color: rgba(242, 234, 227, 0.85);
     padding: 6px 14px;
-    border: 1px solid #c9d2da;
+    border: 1px solid $estructura_soft;
     border-bottom: none;
+    color: $estructura_texto;
 }
 
 QTabBar::tab:selected {
     background-color: rgba(255, 255, 255, 0.97);
+    color: $identidad_texto;
     font-weight: 600;
+    border-bottom: 2px solid $identidad;
 }
 
 QGroupBox {
     background-color: rgba(255, 255, 255, 0.88);
-    border: 1px solid #c9d2da;
+    border: 1px solid $estructura_soft;
     border-radius: 6px;
     margin-top: 12px;
     padding: 10px;
@@ -32,25 +61,67 @@ QGroupBox::title {
     subcontrol-origin: margin;
     left: 10px;
     padding: 0 4px;
+    color: $identidad_texto;
 }
 
 QPushButton {
     padding: 6px 12px;
     border-radius: 4px;
-    border: 1px solid #94a3b8;
+    border: 1px solid $identidad;
     background-color: #ffffff;
+    color: $identidad_texto;
 }
 
 QPushButton:hover {
-    background-color: #e2e8f0;
+    background-color: $identidad_wash;
+}
+
+QPushButton:pressed {
+    background-color: $identidad_soft;
+}
+
+QPushButton:disabled {
+    color: #9a9890;
+    border-color: #d3cebf;
+    background-color: #f4f2ee;
+}
+
+/* Botones de acción crítica (exportar/firmar el documento oficial) -- se
+   marcan explícitamente en el código Python con setProperty("role", "primary"). */
+QPushButton[role="primary"] {
+    background-color: $critico;
+    border: 1px solid $critico_press;
+    color: $critico_on;
+    font-weight: 600;
+}
+
+QPushButton[role="primary"]:hover {
+    background-color: $critico_hover;
+}
+
+QPushButton[role="primary"]:pressed {
+    background-color: $critico_press;
+}
+
+QLineEdit, QComboBox, QDateEdit, QTextEdit {
+    border: 1px solid $estructura_soft;
+    border-radius: 4px;
+    padding: 3px 6px;
+    background-color: #ffffff;
+}
+
+QLineEdit:focus, QComboBox:focus, QDateEdit:focus {
+    border: 1px solid $identidad;
 }
 
 QTableWidget {
-    gridline-color: #cbd5e1;
+    gridline-color: $estructura_soft;
+    selection-background-color: $identidad_wash;
+    selection-color: $identidad_texto;
 }
 
 QHeaderView::section {
-    background-color: #1f3a5f;
-    color: white;
+    background-color: $critico;
+    color: $critico_on;
     padding: 4px;
 }

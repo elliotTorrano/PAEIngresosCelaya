@@ -1,4 +1,6 @@
-"""Agente del PAE: revisa la captura que exportó el Abogado y marca PROCEDE/NO PROCEDE."""
+"""Agente del PAE: revisa la captura que exportó el Abogado y marca PROCEDE/NO
+PROCEDE, para Mandamiento. Mismo flujo que
+app/ui/agente/requerimientos_revision_view.py."""
 
 from __future__ import annotations
 
@@ -25,10 +27,10 @@ from PySide6.QtWidgets import (
 )
 
 from app.config import ROLE_ABOGADO
-from app.db.repositories import revisiones as revisiones_repo
+from app.db.repositories import revisiones_mandamiento as revisiones_repo
 from app.db.repositories import users as users_repo
-from app.excel_io.requerimientos_export import HEADERS_REVISION, export_revision
-from app.excel_io.requerimientos_import import McdiepVerificationError, parse_abogado_export_file
+from app.excel_io.mandamientos_export import HEADERS_REVISION, export_revision
+from app.excel_io.mandamientos_import import McdiepVerificationError, parse_abogado_export_file
 from app.utils.dates import format_local_datetime
 from app.utils.paths import exports_dir
 
@@ -47,10 +49,10 @@ DOC_STATES = (
 )
 
 
-class RequerimientosRevisionView(QWidget):
+class MandamientosRevisionView(QWidget):
     # Emite el nombre del archivo actualmente abierto (o "" tras limpiar/sin
     # selección), para que la ventana que aloja esta vista (una pestaña)
-    # pueda reflejarlo en su título -- ver MainWindow._show_revisar_formato_tab.
+    # pueda reflejarlo en su título -- ver MainWindow._show_revisar_mandamiento_tab.
     archivo_cambiado = Signal(str)
 
     def __init__(self, agente_user: users_repo.User, parent=None, simulate: bool = False):
@@ -91,11 +93,6 @@ class RequerimientosRevisionView(QWidget):
 
         # Pantalla previa: se elige el ESTADO de revisión (Pendiente/Revisado)
         # y sólo entonces se listan los archivos importados en ese estado.
-        # "Abrir" carga el seleccionado en la tabla de abajo -- ésa es la
-        # única forma en que el contenido de la tabla cambia, así que nunca
-        # se "concatenan" filas de dos archivos distintos. "Limpiar" vacía la
-        # lista y cierra lo que estuviera abierto. Cambiar el estado
-        # directamente también vacía la lista mostrada.
         selector_row = QHBoxLayout()
         selector_row.addWidget(QLabel("Estado de revisión:"))
         self.estado_combo = QComboBox()
@@ -171,8 +168,6 @@ class RequerimientosRevisionView(QWidget):
             self.available_list.addItem(item)
 
     def _on_estado_changed(self) -> None:
-        # "Si se cambia directamente el estado, borre los archivos
-        # disponibles": no se conserva la lista del estado anterior.
         self._refresh_available_list()
 
     def _on_open_selected_import(self) -> None:
@@ -268,13 +263,13 @@ class RequerimientosRevisionView(QWidget):
         )
 
     # --- Tabla de revisión -----------------------------------------------------------
-    def _refresh_revision_table(self, rows: list[revisiones_repo.RevisionRow]) -> None:
+    def _refresh_revision_table(self, rows: list[revisiones_repo.RevisionRowMandamiento]) -> None:
         self.revision_table.setUpdatesEnabled(False)
         try:
             self.revision_table.setRowCount(len(rows))
             for r, row in enumerate(rows):
                 values = [
-                    row.folio, row.cta_predial, row.contribuyente, row.domicilio,
+                    row.folio, row.cta_predial, row.contribuyente,
                     row.fecha_citatorio, row.recibe_citatorio, row.recibe_citatorio_nombre,
                     row.fecha_notificacion, row.quien_recibe, row.quien_recibe_nombre,
                 ]
@@ -349,6 +344,6 @@ class RequerimientosRevisionView(QWidget):
             return
 
         fecha = datetime.now().strftime("%d_%m_%Y")
-        output_path = exports_dir() / f"REVISION DEL {fecha}.xlsx"
+        output_path = exports_dir() / f"REVISION MANDAMIENTOS DEL {fecha}.xlsx"
         export_revision(rows, output_path)
         QMessageBox.information(self, "Exportado", f"Archivo exportado:\n{output_path}")

@@ -8,11 +8,13 @@ from PySide6.QtWidgets import QDialog, QFileDialog, QLabel, QMessageBox, QPushBu
 
 from app.auth import recovery
 from app.config import window_title
+from app.ui.widgets.styles import apply_base_style
 
 
 class ImportUpdateDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+        apply_base_style(self)
         self.setWindowTitle(window_title("Importar actualización del Administrador"))
         self.setMinimumWidth(420)
 
