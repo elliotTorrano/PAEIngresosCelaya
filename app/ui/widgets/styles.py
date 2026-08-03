@@ -56,7 +56,16 @@ def apply_window_background(window: QWidget) -> None:
 
     bg_path = settings_repo.get(settings_repo.KEY_BACKGROUND_PATH)
     bg_color = settings_repo.get(settings_repo.KEY_BACKGROUND_COLOR)
-    image_path = Path(bg_path) if bg_path else None
+    if bg_path:
+        image_path = Path(bg_path)
+    elif bg_color:
+        # El Administrador eligió explícitamente "sólo color" -- se respeta,
+        # no se debe imponer el fondo de fábrica encima.
+        image_path = None
+    else:
+        # Nadie ha configurado apariencia en esta máquina todavía: usar el
+        # fondo de fábrica en vez de dejar las ventanas sin imagen.
+        image_path = default_background_path()
 
     for bg_widget in window.findChildren(BackgroundWidget):
         bg_widget.set_image_path(image_path)

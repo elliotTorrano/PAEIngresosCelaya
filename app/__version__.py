@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.20.0"
+__version__ = "0.20.1"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -188,4 +188,10 @@ VERSION_NOTES = {
               "Requerimiento' para continuar marcando PROCEDE/NO PROCEDE. La exportación "
               "como reporte (PENDIENTES DE ENVIAR -> REPORTES ENVIADOS) todavía no está "
               "disponible -- se necesita más planeación para esa fase.",
+    "0.20.1": "Corrección: en una instalación nueva (base de datos vacía), las ventanas "
+              "del programa (Bienvenida, Agente, Abogado, etc.) se veían sin imagen de "
+              "fondo -- sólo el login la traía. Ahora, si el Administrador nunca ha "
+              "configurado una apariencia en 'Otros > Apariencia' en esa máquina, se usa "
+              "un fondo de fábrica por defecto; si el Administrador eligió una imagen o "
+              "un color propio, esa elección se sigue respetando sin cambios.",
 }

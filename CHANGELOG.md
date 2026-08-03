@@ -1,5 +1,18 @@
 # Historial de versiones — Sistema PAE
 
+## 0.20.1
+
+- **Corrección: instalaciones nuevas se veían sin fondo en las ventanas del
+  programa.** Sólo el login trae una imagen fija empacada en el `.exe`; el
+  fondo del resto de las ventanas (Bienvenida, Agente, Abogado, etc.)
+  siempre dependió de que el Administrador lo configurara manualmente en
+  **Otros → Apariencia → "Cambiar imagen de fondo"**, algo que nadie hace
+  todavía en una instalación recién estrenada. Ahora, si esa apariencia
+  nunca se configuró en la máquina, se usa automáticamente un fondo de
+  fábrica (`resources/default_background.png`); si el Administrador ya
+  eligió una imagen o un color propio, esa elección se sigue respetando
+  sin cambios.
+
 ## 0.20.0
 
 - **Nuevo menú "Seguimiento" (Agente del PAE)**: reúne en una sola pantalla
