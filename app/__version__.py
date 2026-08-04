@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.30.0"
+__version__ = "0.31.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -322,4 +322,26 @@ VERSION_NOTES = {
               "cargarlo, avisa que ya no está ahí; si se cargó con una "
               "versión anterior del programa (sin esta función todavía), "
               "avisa que no se guardó su ubicación.",
+    "0.31.0": "Nuevo rol 'Reporteador' (autenticado por certificado, como "
+              "el Agente del PAE), con su propio menú 'Reporte General': "
+              "concentra en un solo lugar, por FOLIO, lo que el Agente "
+              "genera y lo que el Abogado captura, para Requerimientos y "
+              "Mandamientos por separado. Importa la(s) lista(s) de origen "
+              "(con ADEUDO, que antes no se leía) asignando a mano el "
+              "número de LISTA y la fecha de impresión, y después la "
+              "revisión que el Agente exporta al terminar 'Revisar "
+              "Formato' (agrega Despacho y Observaciones). Si un folio ya "
+              "estaba cargado, no se sobrescribe -- se avisa como "
+              "duplicado. El resto de las columnas (domicilio de "
+              "notificación, fechas de entrega/recepción, observaciones "
+              "del área, fecha extrajudicial, motivo de suspensión) se "
+              "capturan a mano en la misma pantalla; 'Asignar fecha de "
+              "entrega por lista' aplica una fecha a todos los folios de "
+              "una lista de una vez. El reporte se guarda en la base de "
+              "datos y además se sincroniza automáticamente a un archivo "
+              ".xlsx maestro (ubicación elegida una vez) cada vez que "
+              "cambia algo, más un botón para exportar una copia manual a "
+              "cualquier otra ubicación. Nuevo también: el Abogado puede "
+              "capturar 'Observaciones' por fila, que viajan hasta el "
+              "reporte.",
 }

@@ -1,5 +1,49 @@
 # Historial de versiones — Sistema PAE
 
+## 0.31.0
+
+- **Nuevo rol "Reporteador"**, autenticado con certificado (como el Agente
+  del PAE), con su propio menú exclusivo **"Reporte General"** -- no ve
+  Formato/Otros-Colores/Histórico/Seguimiento/Ver como, sólo Bienvenida +
+  Reporte General + Otros (Datos de cuenta).
+- El Reporte General concentra, **por FOLIO** (llave única en toda la
+  instalación), lo que genera el Agente y lo que captura el Abogado -- uno
+  para Requerimientos y otro para Mandamientos, con las columnas
+  LISTA / FOLIO / CUENTA PREDIAL / CONTRIBUYENTE / DOMICILIO DE UBICACIÓN /
+  DOMICILIO DE NOTIFICACIÓN / ADEUDO / DESPACHO / FECHA IMPRESO / FECHA DE
+  ENTREGA / FECHA DE RECEPCIÓN / FECHA DE CITATORIO / QUIEN RECIBE
+  CITATORIO / FECHA DE DILIGENCIA / CON QUIEN SE NOTIFICÓ / OBSERVACIONES
+  ABOGADO / OBSERVACIONES DEL ÁREA / FECHA EXTRAJUDICIAL / MOTIVO
+  SUSPENSIÓN PAE (Mandamientos, sin las 2 columnas de domicilio).
+- **Importar lista(s) de origen**: el mismo padrón .xls/.xlsx que sube el
+  Agente, pero leyendo también **ADEUDO** (columna K en Requerimientos, I
+  en Mandamientos, antes nunca leída). Al importar, una ventana pide el
+  número de **LISTA** y la fecha de impresión de cada archivo cargado.
+- **Importar revisión del Agente**: el archivo que el Agente exporta al
+  terminar "Revisar Formato" ahora también trae **Despacho** y
+  **Observaciones**; el Reporteador lo importa y completa, por folio, el
+  resto de los datos capturados por el Abogado.
+- **Protección contra duplicados**: si un folio que llega en un archivo ya
+  estaba cargado en el reporte, **no se sobrescribe** -- se avisa como
+  duplicado (con el conteo y la lista de folios) para no perder una lista
+  o una revisión ya importada por accidente.
+- **Asignar fecha de entrega por lista**: aplica una misma fecha a todos
+  los folios de una LISTA de una sola vez.
+- Las columnas que no vienen de ningún import (domicilio de notificación,
+  fecha de recepción, observaciones del área, fecha extrajudicial, motivo
+  de suspensión) se capturan directamente en la tabla del reporte.
+- El reporte vive en la base de datos y, además, se sincroniza
+  automáticamente a un **archivo .xlsx maestro** (ubicación elegida una
+  vez con "Elegir archivo maestro...") cada vez que cambia algo; también
+  hay un botón "Exportar copia..." para una copia manual en cualquier otra
+  ubicación, independiente del archivo maestro.
+- Nuevo campo **"Observaciones"** en la captura del Abogado (Requerimiento
+  y Mandamiento), que viaja hasta "Revisar Formato" del Agente y de ahí al
+  reporte general.
+- `Administrador`/`Súper-usuario`: nueva caja "Reporteadores" en la
+  pantalla de Usuarios, igual que Agentes del PAE (certificado, sin
+  contraseña).
+
 ## 0.30.0
 
 - Nuevo botón **"Abrir ubicación del archivo"** en el menú **"Histórico"**

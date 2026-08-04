@@ -20,6 +20,11 @@ KEY_THEME_STRUCTURE = "theme_color_structure"
 KEY_PDF_THEME_IDENTITY = "pdf_color_identity"
 KEY_PDF_THEME_CRITICAL = "pdf_color_critical"
 KEY_PDF_THEME_STRUCTURE = "pdf_color_structure"
+# Ruta del archivo .xlsx maestro del reporte general del Reporteador --
+# se regenera por completo (desde la base de datos) cada vez que el reporte
+# cambia. Ver app/ui/reporteador/reporte_requerimientos_view.py.
+KEY_REPORTE_REQUERIMIENTOS_EXCEL_PATH = "reporte_requerimientos_excel_path"
+KEY_REPORTE_MANDAMIENTOS_EXCEL_PATH = "reporte_mandamientos_excel_path"
 
 
 def get(key: str) -> str | None:

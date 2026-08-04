@@ -24,8 +24,12 @@ HEADERS_ABOGADO = HEADERS_AGENTE + [
     "Fecha de Notificación de citatorio",
     "Quién recibe el citatorio",
     "Nombre de quien recibe la notificación",
+    "Observaciones",
 ]
-HEADERS_REVISION = HEADERS_ABOGADO + ["Procede", "ID Abogado"]
+# "Despacho" y "Observaciones" al final: es el archivo que el Agente entrega
+# al Reporteador tras "Revisar Formato" -- ver
+# app/db/repositories/reporte_requerimientos.py::parse_revision_file.
+HEADERS_REVISION = HEADERS_ABOGADO + ["Procede", "ID Abogado", "Despacho"]
 
 
 def build_agente_envelope(
@@ -110,6 +114,7 @@ def build_abogado_envelope(rows: list[RequerimientoRow], *, document_uuid: str |
                 "fecha_notificacion": row.fecha_notificacion,
                 "quien_recibe": row.quien_recibe,
                 "quien_recibe_nombre": row.quien_recibe_nombre,
+                "observaciones": row.observaciones,
             }
             for row in rows
         ],
@@ -152,8 +157,10 @@ def export_revision(rows: list, output_path: Path) -> None:
                 row.fecha_notificacion,
                 row.quien_recibe,
                 row.quien_recibe_nombre,
+                row.observaciones,
                 row.procede,
                 row.abogado_id,
+                row.abogado_nombre,
             ]
         )
     workbook.save(output_path)

@@ -25,6 +25,7 @@ def _write_captura_file(path, folio="F-001"):
         id=1, batch_id=1, folio=folio, cta_predial="CP-001", contribuyente="Juan Pérez", domicilio="Calle 1",
         fecha_citatorio="01/01/2026", recibe_citatorio="EN PUERTA", recibe_citatorio_nombre=None,
         fecha_notificacion="02/01/2026", quien_recibe="EN PUERTA", quien_recibe_nombre=None,
+        observaciones=None,
     )
     export_captured([row], path)
 
@@ -116,6 +117,40 @@ def test_export_revision_writes_file(qapp, db, tmp_path):
 
     matches = list(exports_dir().glob("REVISION DEL *.xlsx"))
     assert len(matches) == 1
+
+
+def test_export_revision_includes_despacho_and_observaciones(qapp, db, tmp_path):
+    import openpyxl
+
+    from app.excel_io.requerimientos_export import HEADERS_REVISION
+    from app.utils.paths import exports_dir
+
+    agente = _make_agente_abogado()
+    row = _row("F-001")
+    row["observaciones"] = "No se encontró a nadie en el domicilio."
+    revision_import_id = revisiones_repo.create_revision_import(
+        agente_id=agente.id, source_filename="x.xlsx", abogado_nombre="Abogado Uno", abogado_id=None,
+    )
+    revisiones_repo.add_revision_rows(
+        agente_id=agente.id, revision_import_id=revision_import_id,
+        source_filename="x.xlsx", abogado_nombre="Abogado Uno", abogado_id=None, rows=[row],
+    )
+
+    view = RequerimientosRevisionView(agente)
+    with patch("app.ui.agente.requerimientos_revision_view.QMessageBox.information"):
+        view._on_export_revision()
+
+    output_path = next(exports_dir().glob("REVISION DEL *.xlsx"))
+    workbook = openpyxl.load_workbook(output_path)
+    sheet = workbook.active
+    header_row = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
+    assert header_row == HEADERS_REVISION
+
+    despacho_col = HEADERS_REVISION.index("Despacho")
+    observaciones_col = HEADERS_REVISION.index("Observaciones")
+    data_rows = list(sheet.iter_rows(min_row=2, values_only=True))
+    assert any(r[despacho_col] == "Abogado Uno" for r in data_rows)
+    assert any(r[observaciones_col] == "No se encontró a nadie en el domicilio." for r in data_rows)
 
 
 def test_simulate_mode_blocks_import_procede_and_export(qapp, db, tmp_path):

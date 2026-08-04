@@ -272,6 +272,7 @@ class MandamientosRevisionView(QWidget):
                     row.folio, row.cta_predial, row.contribuyente,
                     row.fecha_citatorio, row.recibe_citatorio, row.recibe_citatorio_nombre,
                     row.fecha_notificacion, row.quien_recibe, row.quien_recibe_nombre,
+                    row.observaciones,
                 ]
                 for col, value in enumerate(values):
                     item = QTableWidgetItem(value or "")
@@ -291,6 +292,10 @@ class MandamientosRevisionView(QWidget):
                 id_item = QTableWidgetItem(str(row.abogado_id) if row.abogado_id else "")
                 id_item.setFlags(id_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.revision_table.setItem(r, len(values) + 1, id_item)
+
+                despacho_item = QTableWidgetItem(row.abogado_nombre or "")
+                despacho_item.setFlags(despacho_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.revision_table.setItem(r, len(values) + 2, despacho_item)
         finally:
             self.revision_table.setUpdatesEnabled(True)
 

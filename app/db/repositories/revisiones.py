@@ -80,6 +80,7 @@ class RevisionRow:
     fecha_notificacion: str | None
     quien_recibe: str | None
     quien_recibe_nombre: str | None
+    observaciones: str | None
     procede: str | None
     imported_at: str
 
@@ -102,6 +103,7 @@ class RevisionRow:
             fecha_notificacion=row["fecha_notificacion"],
             quien_recibe=row["quien_recibe"],
             quien_recibe_nombre=row["quien_recibe_nombre"],
+            observaciones=row["observaciones"],
             procede=row["procede"],
             imported_at=row["imported_at"],
         )
@@ -135,12 +137,12 @@ def add_revision_rows(
             agente_id, revision_import_id, source_filename, abogado_nombre, abogado_id,
             folio, cta_predial, contribuyente, domicilio,
             fecha_citatorio, recibe_citatorio, recibe_citatorio_nombre,
-            fecha_notificacion, quien_recibe, quien_recibe_nombre
+            fecha_notificacion, quien_recibe, quien_recibe_nombre, observaciones
         ) VALUES (
             :agente_id, :revision_import_id, :source_filename, :abogado_nombre, :abogado_id,
             :folio, :cta_predial, :contribuyente, :domicilio,
             :fecha_citatorio, :recibe_citatorio, :recibe_citatorio_nombre,
-            :fecha_notificacion, :quien_recibe, :quien_recibe_nombre
+            :fecha_notificacion, :quien_recibe, :quien_recibe_nombre, :observaciones
         )
         """,
         [
@@ -151,6 +153,7 @@ def add_revision_rows(
                 "source_filename": source_filename,
                 "abogado_nombre": abogado_nombre,
                 "abogado_id": abogado_id,
+                "observaciones": r.get("observaciones"),
             }
             for r in rows
         ],

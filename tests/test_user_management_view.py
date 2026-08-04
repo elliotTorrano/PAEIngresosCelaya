@@ -60,3 +60,34 @@ def test_administrador_sees_own_data_in_usuarios(qapp, db):
     admin_table = _find_admin_box(view).findChild(QTableWidget)
     assert admin_table.rowCount() == 1
     assert admin_table.item(0, 0).text() == admin.username
+
+
+def test_reporteadores_box_has_no_password_field_and_creates_cert_user(qapp, db):
+    from app.config import ROLE_REPORTEADOR
+    from app.db.repositories import users as users_repo_module
+
+    su = _make_super()
+    view = UserManagementView(su)
+    box = next(b for b in view.findChildren(QGroupBox) if b.title() == "Reporteadores")
+
+    # Igual que Agentes del PAE: sin campo de contraseña (se autentica con certificado).
+    password_fields = [
+        edit for edit in box.findChildren(QLineEdit)
+        if edit.echoMode() == QLineEdit.EchoMode.Password
+    ]
+    assert password_fields == []
+
+    inputs = box.findChildren(QLineEdit)
+    username_input, fullname_input, email_input = inputs[0], inputs[1], inputs[2]
+    username_input.setText("reporteador1")
+    fullname_input.setText("Reporteador Uno")
+    email_input.setText("r@r.com")
+
+    from PySide6.QtWidgets import QPushButton
+    add_btn = next(b for b in box.findChildren(QPushButton) if b.text() == "Agregar")
+    add_btn.click()
+
+    created = users_repo_module.get_by_username("reporteador1")
+    assert created is not None
+    assert created.role == ROLE_REPORTEADOR
+    assert created.auth_type == AUTH_TYPE_CERTIFICADO

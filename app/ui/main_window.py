@@ -12,6 +12,7 @@ from app.config import (
     ROLE_ADMINISTRADOR,
     ROLE_AGENTE_PAE,
     ROLE_LABELS,
+    ROLE_REPORTEADOR,
     ROLE_SUPERUSUARIO,
     ROLES_CAN_ACT_AS_AGENTE,
     is_dummy_user,
@@ -109,6 +110,14 @@ class MainWindow(QMainWindow):
 
         if role == ROLE_AGENTE_PAE:
             self._build_seguimiento_menu()
+
+        if role == ROLE_REPORTEADOR:
+            # Rol dedicado exclusivamente a concentrar el reporte general --
+            # no ve Formato/Histórico/Seguimiento/Ver como, sólo su propio
+            # menú y "Datos de cuenta" (vía _build_otros_menu, que ya oculta
+            # "Colores" para cualquier rol que no sea Agente del PAE).
+            self._build_otros_menu()
+            self._build_reporte_general_menu()
 
         if role == ROLE_SUPERUSUARIO:
             self._build_ver_como_menu()
@@ -304,6 +313,23 @@ class MainWindow(QMainWindow):
             widget = HistoricoView(self.user)
             self.tabs.addTab(widget, "Histórico")
             self._otros_widgets["historico"] = widget
+        self.tabs.setCurrentWidget(widget)
+
+    # --- Menú "Reporte General" (sólo Reporteador) ----------------------------------
+
+    def _build_reporte_general_menu(self) -> None:
+        menu = self.menuBar().addMenu("Reporte General")
+        action = menu.addAction("Ver reporte")
+        action.triggered.connect(self._show_reporte_general_tab)
+
+    def _show_reporte_general_tab(self) -> None:
+        widget = self._otros_widgets.get("reporte_general")
+        if widget is None or self.tabs.indexOf(widget) == -1:
+            from app.ui.reporteador.reporte_general_view import ReporteGeneralView
+
+            widget = ReporteGeneralView(self.user)
+            self.tabs.addTab(widget, "Reporte General")
+            self._otros_widgets["reporte_general"] = widget
         self.tabs.setCurrentWidget(widget)
 
     # --- Menú "Ver como" (sólo Súper-usuario) ---------------------------------------

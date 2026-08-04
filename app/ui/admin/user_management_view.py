@@ -20,7 +20,13 @@ from PySide6.QtWidgets import (
 )
 
 from app.auth.passwords import hash_password
-from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, ROLE_ABOGADO, ROLE_AGENTE_PAE
+from app.config import (
+    AUTH_TYPE_CERTIFICADO,
+    AUTH_TYPE_PASSWORD,
+    ROLE_ABOGADO,
+    ROLE_AGENTE_PAE,
+    ROLE_REPORTEADOR,
+)
 from app.db.repositories import users as users_repo
 
 
@@ -33,6 +39,7 @@ class UserManagementView(QWidget):
         layout.addWidget(self._build_administrador_box())
         layout.addWidget(self._build_role_box("Agentes del PAE", ROLE_AGENTE_PAE, with_password=False))
         layout.addWidget(self._build_role_box("Abogados", ROLE_ABOGADO, with_password=True))
+        layout.addWidget(self._build_role_box("Reporteadores", ROLE_REPORTEADOR, with_password=False))
 
     def _build_administrador_box(self) -> QGroupBox:
         box = QGroupBox("Administrador")

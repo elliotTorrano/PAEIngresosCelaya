@@ -667,6 +667,109 @@ def test_migration_v12_adds_original_path_columns(tmp_path, monkeypatch):
         connection_module._connection = None
 
 
+def test_migration_v13_adds_reporteador_role_and_reporte_tables(tmp_path, monkeypatch):
+    db_file = tmp_path / "v12.db"
+    monkeypatch.setattr(connection_module, "db_path", lambda: db_file)
+    connection_module._connection = None
+
+    # Simula una base v12: users con el CHECK viejo (sin REPORTEADOR),
+    # requerimiento_rows/mandamiento_rows/revision_rows/
+    # mandamiento_revision_rows sin la columna observaciones, y sin las
+    # tablas reporte_*_rows todavía. Se preserva un usuario existente para
+    # confirmar que la reconstrucción de `users` no pierde datos.
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+    conn.execute("INSERT INTO schema_version (version) VALUES (12)")
+    conn.execute(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL CHECK (role IN ('SUPERUSUARIO', 'ADMINISTRADOR', 'AGENTE_PAE', 'ABOGADO')),
+            full_name TEXT NOT NULL, email TEXT, auth_type TEXT NOT NULL,
+            password_hash TEXT, password_salt TEXT, cert_public_pem TEXT, cert_serial TEXT,
+            cert_file_path TEXT, recovery_code_hash TEXT, recovery_code_salt TEXT,
+            must_change_password INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO users (username, role, full_name, auth_type) VALUES ('agente1', 'AGENTE_PAE', 'Agente Uno', 'CERTIFICADO')"
+    )
+    conn.execute(
+        """
+        CREATE TABLE requerimiento_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id INTEGER NOT NULL,
+            folio TEXT, cta_predial TEXT, contribuyente TEXT, domicilio TEXT, captured_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE mandamiento_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id INTEGER NOT NULL,
+            folio TEXT, cta_predial TEXT, contribuyente TEXT, captured_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE revision_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, agente_id INTEGER NOT NULL,
+            source_filename TEXT NOT NULL, folio TEXT, procede TEXT,
+            imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE mandamiento_revision_rows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, agente_id INTEGER NOT NULL,
+            source_filename TEXT NOT NULL, folio TEXT, procede TEXT,
+            imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        ensure_schema()
+
+        conn = connection_module.get_connection()
+
+        # El usuario preexistente se conserva a través de la reconstrucción.
+        row = conn.execute("SELECT full_name, role FROM users WHERE username = 'agente1'").fetchone()
+        assert row["full_name"] == "Agente Uno"
+        assert row["role"] == "AGENTE_PAE"
+
+        # El CHECK viejo ya no bloquea REPORTEADOR.
+        conn.execute(
+            "INSERT INTO users (username, role, full_name, auth_type) VALUES ('reporteador1', 'REPORTEADOR', 'Reporteador Uno', 'CERTIFICADO')"
+        )
+        conn.commit()
+        nuevo = conn.execute("SELECT role FROM users WHERE username = 'reporteador1'").fetchone()
+        assert nuevo["role"] == "REPORTEADOR"
+
+        for table in ("requerimiento_rows", "mandamiento_rows", "revision_rows", "mandamiento_revision_rows"):
+            columns = [r["name"] for r in conn.execute(f"PRAGMA table_info({table})")]
+            assert "observaciones" in columns
+
+        tables = {r["name"] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "reporte_requerimientos_rows" in tables
+        assert "reporte_mandamientos_rows" in tables
+
+        reporte_columns = [r["name"] for r in conn.execute("PRAGMA table_info(reporte_requerimientos_rows)")]
+        for col in ("lista_numero", "folio", "adeudo", "despacho", "fecha_impreso", "fecha_entrega",
+                    "observaciones_abogado", "observaciones_area", "fecha_extrajudicial", "motivo_suspension"):
+            assert col in reporte_columns
+
+        version = conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+        assert version == CURRENT_VERSION
+    finally:
+        connection_module._connection = None
+
+
 def test_fresh_schema_already_has_column(tmp_path, monkeypatch):
     db_file = tmp_path / "fresh.db"
     monkeypatch.setattr(connection_module, "db_path", lambda: db_file)

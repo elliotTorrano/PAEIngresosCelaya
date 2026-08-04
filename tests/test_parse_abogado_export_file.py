@@ -8,6 +8,7 @@ def _make_row(**overrides) -> RequerimientoRow:
         id=1, batch_id=1, folio="F-001", cta_predial="CP-001", contribuyente="Juan Pérez", domicilio="Calle 1",
         fecha_citatorio="01/01/2026", recibe_citatorio="EN PUERTA", recibe_citatorio_nombre=None,
         fecha_notificacion="02/01/2026", quien_recibe="NOMBRE", quien_recibe_nombre="MARIA LOPEZ",
+        observaciones=None,
     )
     base.update(overrides)
     return RequerimientoRow(**base)

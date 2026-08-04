@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 CREATE TABLE IF NOT EXISTS users (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     username        TEXT NOT NULL UNIQUE,
-    role            TEXT NOT NULL CHECK (role IN ('SUPERUSUARIO', 'ADMINISTRADOR', 'AGENTE_PAE', 'ABOGADO')),
+    role            TEXT NOT NULL CHECK (role IN ('SUPERUSUARIO', 'ADMINISTRADOR', 'AGENTE_PAE', 'ABOGADO', 'REPORTEADOR')),
     full_name       TEXT NOT NULL,
     email           TEXT,
     auth_type       TEXT NOT NULL CHECK (auth_type IN ('CERTIFICADO', 'PASSWORD')),
@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS requerimiento_rows (
     fecha_notificacion       TEXT,
     quien_recibe             TEXT CHECK (quien_recibe IN ('EN PUERTA', 'NOMBRE', 'HOJA DE CAMPO')),
     quien_recibe_nombre      TEXT,
+    observaciones            TEXT,
     captured_at              TEXT
 );
 
@@ -109,6 +110,7 @@ CREATE TABLE IF NOT EXISTS revision_rows (
     fecha_notificacion       TEXT,
     quien_recibe             TEXT,
     quien_recibe_nombre      TEXT,
+    observaciones            TEXT,
     procede                  TEXT CHECK (procede IN ('PROCEDE', 'NO PROCEDE')),
     imported_at              TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -147,6 +149,7 @@ CREATE TABLE IF NOT EXISTS mandamiento_rows (
     fecha_notificacion       TEXT,
     quien_recibe             TEXT CHECK (quien_recibe IN ('EN PUERTA', 'NOMBRE', 'HOJA DE CAMPO')),
     quien_recibe_nombre      TEXT,
+    observaciones            TEXT,
     captured_at              TEXT
 );
 
@@ -191,8 +194,59 @@ CREATE TABLE IF NOT EXISTS mandamiento_revision_rows (
     fecha_notificacion       TEXT,
     quien_recibe             TEXT,
     quien_recibe_nombre      TEXT,
+    observaciones            TEXT,
     procede                  TEXT CHECK (procede IN ('PROCEDE', 'NO PROCEDE')),
     imported_at              TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS reporte_requerimientos_rows (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    lista_numero           TEXT,
+    folio                  TEXT NOT NULL UNIQUE,
+    cta_predial            TEXT,
+    contribuyente          TEXT,
+    domicilio_ubicacion    TEXT,
+    domicilio_notificacion TEXT,
+    adeudo                 TEXT,
+    despacho               TEXT,
+    fecha_impreso          TEXT,
+    fecha_entrega           TEXT,
+    fecha_recepcion        TEXT,
+    fecha_citatorio        TEXT,
+    quien_recibe_citatorio TEXT,
+    fecha_diligencia       TEXT,
+    con_quien_notifico     TEXT,
+    observaciones_abogado  TEXT,
+    observaciones_area     TEXT,
+    fecha_extrajudicial    TEXT,
+    motivo_suspension      TEXT,
+    source_filename        TEXT,
+    created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS reporte_mandamientos_rows (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    lista_numero           TEXT,
+    folio                  TEXT NOT NULL UNIQUE,
+    cta_predial            TEXT,
+    contribuyente          TEXT,
+    adeudo                 TEXT,
+    despacho               TEXT,
+    fecha_impreso          TEXT,
+    fecha_entrega           TEXT,
+    fecha_recepcion        TEXT,
+    fecha_citatorio        TEXT,
+    quien_recibe_citatorio TEXT,
+    fecha_diligencia       TEXT,
+    con_quien_notifico     TEXT,
+    observaciones_abogado  TEXT,
+    observaciones_area     TEXT,
+    fecha_extrajudicial    TEXT,
+    motivo_suspension      TEXT,
+    source_filename        TEXT,
+    created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS app_settings (
@@ -222,3 +276,6 @@ CREATE INDEX IF NOT EXISTS idx_mandamiento_batches_abogado ON mandamiento_batche
 CREATE INDEX IF NOT EXISTS idx_mandamiento_rows_batch ON mandamiento_rows(batch_id);
 CREATE INDEX IF NOT EXISTS idx_mandamiento_revision_rows_agente ON mandamiento_revision_rows(agente_id);
 CREATE INDEX IF NOT EXISTS idx_mandamiento_revision_imports_agente ON mandamiento_revision_imports(agente_id);
+
+CREATE INDEX IF NOT EXISTS idx_reporte_requerimientos_folio ON reporte_requerimientos_rows(folio);
+CREATE INDEX IF NOT EXISTS idx_reporte_mandamientos_folio ON reporte_mandamientos_rows(folio);

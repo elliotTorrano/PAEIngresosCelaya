@@ -23,6 +23,7 @@ class RequerimientoRow:
     fecha_notificacion: str | None
     quien_recibe: str | None
     quien_recibe_nombre: str | None
+    observaciones: str | None
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "RequerimientoRow":
@@ -39,6 +40,7 @@ class RequerimientoRow:
             fecha_notificacion=row["fecha_notificacion"],
             quien_recibe=row["quien_recibe"],
             quien_recibe_nombre=row["quien_recibe_nombre"],
+            observaciones=row["observaciones"],
         )
 
     @property
@@ -57,6 +59,7 @@ class RequerimientoRow:
             (
                 self.fecha_citatorio, self.recibe_citatorio, self.recibe_citatorio_nombre,
                 self.fecha_notificacion, self.quien_recibe, self.quien_recibe_nombre,
+                self.observaciones,
             )
         )
 
@@ -172,6 +175,7 @@ def update_row_capture(
     fecha_notificacion: str | None,
     quien_recibe: str | None,
     quien_recibe_nombre: str | None,
+    observaciones: str | None = None,
 ) -> None:
     conn = get_connection()
     conn.execute(
@@ -179,13 +183,13 @@ def update_row_capture(
         UPDATE requerimiento_rows
         SET fecha_citatorio = ?, recibe_citatorio = ?, recibe_citatorio_nombre = ?,
             fecha_notificacion = ?, quien_recibe = ?, quien_recibe_nombre = ?,
-            captured_at = datetime('now')
+            observaciones = ?, captured_at = datetime('now')
         WHERE id = ?
         """,
         (
             fecha_citatorio, recibe_citatorio, recibe_citatorio_nombre,
             fecha_notificacion, quien_recibe, quien_recibe_nombre,
-            row_id,
+            observaciones, row_id,
         ),
     )
     conn.commit()

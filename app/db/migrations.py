@@ -8,7 +8,7 @@ from pathlib import Path
 from app.db.connection import get_connection
 
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
-CURRENT_VERSION = 12
+CURRENT_VERSION = 13
 
 # Migraciones incrementales para bases de datos creadas con una versión anterior
 # del esquema. schema.sql ya crea las tablas nuevas "desde cero" con todo esto
@@ -235,6 +235,108 @@ _MIGRATIONS: dict[int, str | list[str]] = {
         # con original_path NULL (no se puede reconstruir esa ruta después).
         "ALTER TABLE imported_files ADD COLUMN original_path TEXT",
         "ALTER TABLE mandamiento_imported_files ADD COLUMN original_path TEXT",
+    ],
+    13: [
+        # Nuevo rol REPORTEADOR (concentra en un solo "reporte general" lo
+        # que el Agente genera y lo que el Abogado captura, por FOLIO) --
+        # SQLite no permite modificar un CHECK existente con ALTER TABLE,
+        # así que se reconstruye `users` igual que se hizo con
+        # `requerimiento_rows` en la migración v10. A diferencia de aquella,
+        # `users` SÍ es referenciada por FK desde muchas otras tablas
+        # (batches, imported_files, revision_rows, etc.) -- con
+        # `foreign_keys = ON` (activado por get_connection(), ver
+        # app/db/connection.py), reconstruirla a mitad de esas referencias
+        # falla con IntegrityError; se desactiva la verificación sólo
+        # mientras dura este bloque y se reactiva al final.
+        "PRAGMA foreign_keys = OFF",
+        """CREATE TABLE users_v13 (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            username        TEXT NOT NULL UNIQUE,
+            role            TEXT NOT NULL CHECK (role IN ('SUPERUSUARIO', 'ADMINISTRADOR', 'AGENTE_PAE', 'ABOGADO', 'REPORTEADOR')),
+            full_name       TEXT NOT NULL,
+            email           TEXT,
+            auth_type       TEXT NOT NULL CHECK (auth_type IN ('CERTIFICADO', 'PASSWORD')),
+            password_hash   TEXT,
+            password_salt   TEXT,
+            cert_public_pem TEXT,
+            cert_serial     TEXT,
+            cert_file_path  TEXT,
+            recovery_code_hash TEXT,
+            recovery_code_salt TEXT,
+            must_change_password INTEGER NOT NULL DEFAULT 0,
+            active          INTEGER NOT NULL DEFAULT 1,
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        """INSERT INTO users_v13
+            SELECT id, username, role, full_name, email, auth_type, password_hash, password_salt,
+                   cert_public_pem, cert_serial, cert_file_path, recovery_code_hash, recovery_code_salt,
+                   must_change_password, active, created_at, updated_at
+            FROM users""",
+        "DROP TABLE users",
+        "ALTER TABLE users_v13 RENAME TO users",
+        "PRAGMA foreign_keys = ON",
+        # Campo "Observaciones" que el Abogado captura junto con las demás
+        # columnas de citatorio/notificación -- viaja hasta la revisión del
+        # Agente y de ahí al reporte general del Reporteador.
+        "ALTER TABLE requerimiento_rows ADD COLUMN observaciones TEXT",
+        "ALTER TABLE mandamiento_rows ADD COLUMN observaciones TEXT",
+        "ALTER TABLE revision_rows ADD COLUMN observaciones TEXT",
+        "ALTER TABLE mandamiento_revision_rows ADD COLUMN observaciones TEXT",
+        # Reporte general: una fila por FOLIO (llave única), concentrando
+        # datos del archivo de origen (que el Reporteador importa
+        # directamente) y de la revisión que el Agente exporta al terminar
+        # "Revisar Formato" -- ver app/db/repositories/reporte_requerimientos.py.
+        """CREATE TABLE IF NOT EXISTS reporte_requerimientos_rows (
+            id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+            lista_numero           TEXT,
+            folio                  TEXT NOT NULL UNIQUE,
+            cta_predial            TEXT,
+            contribuyente          TEXT,
+            domicilio_ubicacion    TEXT,
+            domicilio_notificacion TEXT,
+            adeudo                 TEXT,
+            despacho               TEXT,
+            fecha_impreso          TEXT,
+            fecha_entrega          TEXT,
+            fecha_recepcion        TEXT,
+            fecha_citatorio        TEXT,
+            quien_recibe_citatorio TEXT,
+            fecha_diligencia       TEXT,
+            con_quien_notifico     TEXT,
+            observaciones_abogado  TEXT,
+            observaciones_area     TEXT,
+            fecha_extrajudicial    TEXT,
+            motivo_suspension      TEXT,
+            source_filename        TEXT,
+            created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        """CREATE TABLE IF NOT EXISTS reporte_mandamientos_rows (
+            id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+            lista_numero           TEXT,
+            folio                  TEXT NOT NULL UNIQUE,
+            cta_predial            TEXT,
+            contribuyente          TEXT,
+            adeudo                 TEXT,
+            despacho               TEXT,
+            fecha_impreso          TEXT,
+            fecha_entrega          TEXT,
+            fecha_recepcion        TEXT,
+            fecha_citatorio        TEXT,
+            quien_recibe_citatorio TEXT,
+            fecha_diligencia       TEXT,
+            con_quien_notifico     TEXT,
+            observaciones_abogado  TEXT,
+            observaciones_area     TEXT,
+            fecha_extrajudicial    TEXT,
+            motivo_suspension      TEXT,
+            source_filename        TEXT,
+            created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_reporte_requerimientos_folio ON reporte_requerimientos_rows(folio)",
+        "CREATE INDEX IF NOT EXISTS idx_reporte_mandamientos_folio ON reporte_mandamientos_rows(folio)",
     ],
 }
 

@@ -7,6 +7,7 @@ from app.config import (
     ROLE_ABOGADO,
     ROLE_ADMINISTRADOR,
     ROLE_AGENTE_PAE,
+    ROLE_REPORTEADOR,
     ROLE_SUPERUSUARIO,
 )
 from app.db.repositories import users as users_repo
@@ -41,6 +42,13 @@ def _make_admin():
 def _make_super():
     return users_repo.create_user(
         username="super1", role=ROLE_SUPERUSUARIO, full_name="Super Uno", email="s@s.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+
+
+def _make_reporteador(username="reporteador1"):
+    return users_repo.create_user(
+        username=username, role=ROLE_REPORTEADOR, full_name="Reporteador Uno", email="r@r.com",
         auth_type=AUTH_TYPE_CERTIFICADO,
     )
 
@@ -404,3 +412,43 @@ def test_super_can_open_agente_simulation_via_choose_dialog(qapp, db):
     assert f"revisar:{agente.id}" in window._viendo_como_widgets
     assert f"generar_mandamiento:{agente.id}" in window._viendo_como_widgets
     assert f"revisar_mandamiento:{agente.id}" in window._viendo_como_widgets
+
+
+# --- Reporteador -----------------------------------------------------------------------
+
+def test_reporteador_starts_on_welcome_only(qapp, db):
+    window = MainWindow(_make_reporteador())
+    assert _tab_titles(window) == ["Bienvenida"]
+
+
+def test_reporteador_only_sees_otros_and_reporte_general_menus(qapp, db):
+    window = MainWindow(_make_reporteador())
+    menu_titles = [action.text() for action in window.menuBar().actions()]
+
+    assert "Reporte General" in menu_titles
+    assert "Otros" in menu_titles
+    assert "Formato" not in menu_titles
+    assert "Histórico" not in menu_titles
+    assert "Seguimiento" not in menu_titles
+    assert "Ver como" not in menu_titles
+
+
+def test_reporteador_otros_menu_has_datos_cuenta_but_not_colores(qapp, db):
+    window = MainWindow(_make_reporteador())
+    otros_titles = [
+        action.text()
+        for menu_action in window.menuBar().actions()
+        if menu_action.text() == "Otros"
+        for action in menu_action.menu().actions()
+    ]
+    assert "Datos de cuenta" in otros_titles
+    assert "Colores" not in otros_titles
+
+
+def test_reporteador_show_reporte_general_tab_adds_and_reuses(qapp, db):
+    window = MainWindow(_make_reporteador())
+
+    window._show_reporte_general_tab()
+    assert "Reporte General" in _tab_titles(window)
+    window._show_reporte_general_tab()
+    assert _tab_titles(window).count("Reporte General") == 1

@@ -50,11 +50,13 @@ from app.utils.paths import exports_dir
     COL_FOLIO, COL_CTA, COL_CONTRIB, COL_DOM,
     COL_FECHA_CIT, COL_RECIBE_CIT, COL_NOMBRE_CIT,
     COL_FECHA_NOT, COL_QUIEN_NOT, COL_NOMBRE_NOT,
-) = range(10)
+    COL_OBSERVACIONES,
+) = range(11)
 HEADERS = [
     "FOLIO", "CTA PREDIAL", "CONTRIBUYENTE", "DOMICILIO",
     "Fecha de citatorio", "Recibe citatorio", "Nombre",
     "Fecha de notificación", "Quién recibe", "Nombre",
+    "Observaciones",
 ]
 
 HIGHLIGHT_COLOR = QColor("#ffe08a")
@@ -329,6 +331,7 @@ class RequerimientosCaptureView(QWidget):
                     fecha_value=row.fecha_notificacion, quien_value=row.quien_recibe,
                     nombre_value=row.quien_recibe_nombre,
                 )
+                self._build_observaciones_cell(r, row.id, row.observaciones)
         finally:
             self.table.setUpdatesEnabled(True)
 
@@ -368,6 +371,12 @@ class RequerimientosCaptureView(QWidget):
         )
         nombre_edit.textChanged.connect(lambda text, rid=row_id, edit=nombre_edit: self._on_nombre_changed(rid, text, edit))
 
+    def _build_observaciones_cell(self, table_row: int, row_id: int, value: str | None) -> None:
+        observaciones_edit = QLineEdit(value or "")
+        observaciones_edit.setEnabled(not self._current_batch_finalizado)
+        observaciones_edit.editingFinished.connect(lambda rid=row_id: self._save_row(rid))
+        self.table.setCellWidget(table_row, COL_OBSERVACIONES, observaciones_edit)
+
     def _on_quien_changed(self, row_id: int, combo: QComboBox, name_edit: QLineEdit) -> None:
         value = combo.currentData()
         name_edit.setEnabled(value == QUIEN_RECIBE_NOMBRE)
@@ -398,6 +407,8 @@ class RequerimientosCaptureView(QWidget):
         fecha_notificacion, quien_recibe, quien_recibe_nombre = self._read_capture_trio(
             table_row, date_col=COL_FECHA_NOT, combo_col=COL_QUIEN_NOT, name_col=COL_NOMBRE_NOT
         )
+        observaciones_edit: QLineEdit = self.table.cellWidget(table_row, COL_OBSERVACIONES)
+        observaciones = observaciones_edit.text().strip() or None
 
         if not self.simulate:
             req_repo.update_row_capture(
@@ -408,6 +419,7 @@ class RequerimientosCaptureView(QWidget):
                 fecha_notificacion=fecha_notificacion,
                 quien_recibe=quien_recibe,
                 quien_recibe_nombre=quien_recibe_nombre,
+                observaciones=observaciones,
             )
         for row in self._rows:
             if row.id == row_id:
@@ -417,6 +429,7 @@ class RequerimientosCaptureView(QWidget):
                 row.fecha_notificacion = fecha_notificacion
                 row.quien_recibe = quien_recibe
                 row.quien_recibe_nombre = quien_recibe_nombre
+                row.observaciones = observaciones
                 break
         self._update_counters()
 

@@ -633,6 +633,61 @@ def test_search_by_contribuyente_selects_matching_row(qapp, db):
     assert view.table.currentRow() == 1
 
 
+# --- Observaciones -----------------------------------------------------------------
+
+def test_observaciones_field_saves_and_persists(qapp, db):
+    from app.ui.abogado.requerimientos_capture_view import COL_OBSERVACIONES
+
+    _, abogado, batch_id = _make_agente_abogado_with_batch()
+    view = RequerimientosCaptureView(abogado)
+    view._load_batch(batch_id)
+
+    field = view.table.cellWidget(0, COL_OBSERVACIONES)
+    field.setText("Domicilio cerrado, se dejó citatorio con vecino.")
+    field.editingFinished.emit()
+
+    persisted = req_repo.list_rows(batch_id)[0]
+    assert persisted.observaciones == "Domicilio cerrado, se dejó citatorio con vecino."
+
+
+def test_observaciones_only_change_counts_as_modified_for_export(qapp, db):
+    from app.utils.paths import exports_dir
+    from app.ui.abogado.requerimientos_capture_view import COL_OBSERVACIONES
+
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente Uno", email="a@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    abogado = users_repo.create_user(
+        username="abogado1", role=ROLE_ABOGADO, full_name="Abogado Uno", email="b@b.com",
+        auth_type=AUTH_TYPE_PASSWORD, password_hash="x", password_salt="y",
+    )
+    batch_id = req_repo.create_batch(abogado_id=abogado.id, agente_id=agente.id)
+    req_repo.add_rows(batch_id, [
+        {"folio": "F-001", "cta_predial": "CP-001", "contribuyente": "Juan Pérez", "domicilio": "Calle 1"}
+    ])
+
+    view = RequerimientosCaptureView(abogado)
+    view._load_batch(batch_id)
+    field = view.table.cellWidget(0, COL_OBSERVACIONES)
+    field.setText("Sólo observación, sin captura de citatorio.")
+    field.editingFinished.emit()
+
+    with patch(
+        "app.ui.abogado.requerimientos_capture_view.RequerimientosCaptureView._ask_export_choice",
+        return_value="only",
+    ), patch(
+        "app.ui.abogado.requerimientos_capture_view.QFileDialog.getExistingDirectory",
+        return_value=str(exports_dir()),
+    ), patch("app.ui.abogado.requerimientos_capture_view.QMessageBox.information"):
+        view._on_export()
+
+    output_path = next(exports_dir().glob("*.mcdiep"))
+    exported_rows = parse_abogado_export_file(output_path).rows
+    assert len(exported_rows) == 1
+    assert exported_rows[0]["observaciones"] == "Sólo observación, sin captura de citatorio."
+
+
 def test_search_no_match_shows_information(qapp, db):
     _, abogado, batch_id = _make_agente_abogado_with_batch()
     view = RequerimientosCaptureView(abogado)
