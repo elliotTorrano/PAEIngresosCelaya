@@ -8,7 +8,7 @@ from pathlib import Path
 from app.db.connection import get_connection
 
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
-CURRENT_VERSION = 11
+CURRENT_VERSION = 12
 
 # Migraciones incrementales para bases de datos creadas con una versión anterior
 # del esquema. schema.sql ya crea las tablas nuevas "desde cero" con todo esto
@@ -226,6 +226,15 @@ _MIGRATIONS: dict[int, str | list[str]] = {
         "CREATE INDEX IF NOT EXISTS idx_mandamiento_rows_batch ON mandamiento_rows(batch_id)",
         "CREATE INDEX IF NOT EXISTS idx_mandamiento_revision_rows_agente ON mandamiento_revision_rows(agente_id)",
         "CREATE INDEX IF NOT EXISTS idx_mandamiento_revision_imports_agente ON mandamiento_revision_imports(agente_id)",
+    ],
+    12: [
+        # Ruta completa (no sólo el nombre) del archivo tal como estaba en el
+        # equipo al momento de cargarlo -- la usa el botón "Abrir ubicación
+        # del archivo" del menú Histórico para reabrir el Explorador de
+        # Windows justo ahí. Los registros previos a esta migración quedan
+        # con original_path NULL (no se puede reconstruir esa ruta después).
+        "ALTER TABLE imported_files ADD COLUMN original_path TEXT",
+        "ALTER TABLE mandamiento_imported_files ADD COLUMN original_path TEXT",
     ],
 }
 

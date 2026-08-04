@@ -600,6 +600,73 @@ def test_migration_v11_creates_mandamiento_tables(tmp_path, monkeypatch):
         connection_module._connection = None
 
 
+def test_migration_v12_adds_original_path_columns(tmp_path, monkeypatch):
+    db_file = tmp_path / "v11.db"
+    monkeypatch.setattr(connection_module, "db_path", lambda: db_file)
+    connection_module._connection = None
+
+    # Simula una base v11: imported_files/mandamiento_imported_files sin la
+    # columna original_path, con un registro previo ya guardado.
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+    conn.execute("INSERT INTO schema_version (version) VALUES (11)")
+    conn.execute(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL, full_name TEXT NOT NULL, email TEXT, auth_type TEXT NOT NULL,
+            password_hash TEXT, password_salt TEXT, cert_public_pem TEXT, cert_serial TEXT,
+            must_change_password INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE imported_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, original_filename TEXT NOT NULL,
+            agente_id INTEGER NOT NULL, abogado_id INTEGER NOT NULL, batch_id INTEGER,
+            row_count INTEGER NOT NULL DEFAULT 0, imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE mandamiento_imported_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, original_filename TEXT NOT NULL,
+            agente_id INTEGER NOT NULL, abogado_id INTEGER NOT NULL, batch_id INTEGER,
+            row_count INTEGER NOT NULL DEFAULT 0, imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO imported_files (original_filename, agente_id, abogado_id, row_count) "
+        "VALUES ('viejo.xlsx', 1, 2, 3)"
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        ensure_schema()
+
+        conn = connection_module.get_connection()
+        columns = [row["name"] for row in conn.execute("PRAGMA table_info(imported_files)")]
+        assert "original_path" in columns
+        mand_columns = [row["name"] for row in conn.execute("PRAGMA table_info(mandamiento_imported_files)")]
+        assert "original_path" in mand_columns
+
+        # El registro previo se conserva, con original_path en NULL (no se
+        # puede reconstruir esa ruta después del hecho).
+        row = conn.execute("SELECT original_filename, original_path FROM imported_files").fetchone()
+        assert row["original_filename"] == "viejo.xlsx"
+        assert row["original_path"] is None
+
+        version = conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+        assert version == CURRENT_VERSION
+    finally:
+        connection_module._connection = None
+
+
 def test_fresh_schema_already_has_column(tmp_path, monkeypatch):
     db_file = tmp_path / "fresh.db"
     monkeypatch.setattr(connection_module, "db_path", lambda: db_file)

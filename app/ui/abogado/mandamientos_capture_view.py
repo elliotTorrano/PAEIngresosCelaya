@@ -274,7 +274,7 @@ class MandamientosCaptureView(QWidget):
         mand_repo.add_rows(batch_id, result.rows)
         mand_repo.record_imported_file(
             original_filename=Path(file_path).name, agente_id=agente.id, abogado_id=self.abogado_user.id,
-            batch_id=batch_id, row_count=len(result.rows),
+            batch_id=batch_id, row_count=len(result.rows), original_path=file_path,
         )
         mand_repo.set_batch_export_path(
             batch_id, agente_uuid=result.document_uuid, agente_hash=result.file_hash,

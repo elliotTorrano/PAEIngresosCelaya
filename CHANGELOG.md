@@ -1,5 +1,21 @@
 # Historial de versiones — Sistema PAE
 
+## 0.30.0
+
+- Nuevo botón **"Abrir ubicación del archivo"** en el menú **"Histórico"**
+  (Agente del PAE y Abogado, pestañas Requerimiento y Mandamiento):
+  seleccionando una fila de un archivo cargado, abre el Explorador de
+  Windows en la carpeta donde estaba ese archivo al momento de importarlo,
+  con el archivo ya seleccionado.
+- Se guarda ahora la **ruta completa** de cada archivo cargado (antes sólo
+  se guardaba el nombre) -- migración de base de datos v12
+  (`imported_files.original_path` / `mandamiento_imported_files.original_path`).
+  Los registros anteriores a esta versión quedan sin ruta (no se puede
+  reconstruir después del hecho): al intentar abrir su ubicación, se avisa
+  que no se registró.
+- Si el archivo ya no está en esa ubicación (se movió o se borró), se
+  avisa en vez de fallar.
+
 ## 0.29.0
 
 - **"Generar Formato" (Requerimiento y Mandamiento) del Agente del PAE**

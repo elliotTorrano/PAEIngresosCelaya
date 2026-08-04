@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS imported_files (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     original_filename TEXT NOT NULL,
+    original_path     TEXT,
     agente_id         INTEGER NOT NULL REFERENCES users(id),
     abogado_id        INTEGER NOT NULL REFERENCES users(id),
     batch_id          INTEGER REFERENCES requerimiento_batches(id),
@@ -152,6 +153,7 @@ CREATE TABLE IF NOT EXISTS mandamiento_rows (
 CREATE TABLE IF NOT EXISTS mandamiento_imported_files (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     original_filename TEXT NOT NULL,
+    original_path     TEXT,
     agente_id         INTEGER NOT NULL REFERENCES users(id),
     abogado_id        INTEGER NOT NULL REFERENCES users(id),
     batch_id          INTEGER REFERENCES mandamiento_batches(id),

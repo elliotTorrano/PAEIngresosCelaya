@@ -147,7 +147,7 @@ class MandamientosGenerarView(QWidget):
                 # No se restringe por repetición -- eso sólo aplica al lote en curso.
                 mand_repo.record_imported_file(
                     original_filename=path.name, agente_id=self.agente_user.id, abogado_id=abogado_id,
-                    row_count=result.row_count,
+                    row_count=result.row_count, original_path=str(path),
                 )
 
         self._refresh_preview()

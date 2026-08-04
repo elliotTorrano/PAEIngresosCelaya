@@ -84,18 +84,21 @@ def add_rows(batch_id: int, rows: list[dict]) -> None:
 
 
 def record_imported_file(
-    *, original_filename: str, agente_id: int, abogado_id: int, row_count: int, batch_id: int | None = None
+    *, original_filename: str, agente_id: int, abogado_id: int, row_count: int, batch_id: int | None = None,
+    original_path: str | None = None,
 ) -> None:
     """Registra en el histórico que se subió un archivo (quién, cuándo, cuántas
     filas). No hay restricción de unicidad: el mismo nombre puede volver a
-    aparecer tantas veces como se vuelva a subir, cada vez con su propia fecha."""
+    aparecer tantas veces como se vuelva a subir, cada vez con su propia fecha.
+    original_path es la ruta completa en el equipo de origen -- la usa el
+    botón "Abrir ubicación del archivo" de Histórico."""
     conn = get_connection()
     conn.execute(
         """
-        INSERT INTO imported_files (original_filename, agente_id, abogado_id, batch_id, row_count)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO imported_files (original_filename, original_path, agente_id, abogado_id, batch_id, row_count)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (original_filename, agente_id, abogado_id, batch_id, row_count),
+        (original_filename, original_path, agente_id, abogado_id, batch_id, row_count),
     )
     conn.commit()
 
@@ -192,7 +195,7 @@ def list_imported_files_for_agente(agente_id: int) -> list[sqlite3.Row]:
     conn = get_connection()
     return conn.execute(
         """
-        SELECT f.id, f.original_filename, f.row_count, f.imported_at,
+        SELECT f.id, f.original_filename, f.original_path, f.row_count, f.imported_at,
                bu.full_name AS abogado_nombre
         FROM imported_files f
         LEFT JOIN users bu ON bu.id = f.abogado_id
@@ -207,7 +210,7 @@ def list_imported_files_for_abogado(abogado_id: int) -> list[sqlite3.Row]:
     conn = get_connection()
     return conn.execute(
         """
-        SELECT f.id, f.original_filename, f.row_count, f.imported_at,
+        SELECT f.id, f.original_filename, f.original_path, f.row_count, f.imported_at,
                au.full_name AS agente_nombre
         FROM imported_files f
         LEFT JOIN users au ON au.id = f.agente_id

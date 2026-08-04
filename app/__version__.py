@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.29.0"
+__version__ = "0.30.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -314,4 +314,12 @@ VERSION_NOTES = {
               "para importar dentro del programa. Esto no aplica a las "
               "exportaciones de prueba de 'agente_dummy' (siguen siendo "
               "sólo .mcdiep + PDF de una página).",
+    "0.30.0": "Nuevo botón 'Abrir ubicación del archivo' en el menú "
+              "'Histórico' (Agente del PAE y Abogado, cualquier tipo de "
+              "documento): seleccionando una fila, abre el Explorador de "
+              "Windows justo en la carpeta de origen con ese archivo ya "
+              "seleccionado. Si el archivo se movió o se borró después de "
+              "cargarlo, avisa que ya no está ahí; si se cargó con una "
+              "versión anterior del programa (sin esta función todavía), "
+              "avisa que no se guardó su ubicación.",
 }
