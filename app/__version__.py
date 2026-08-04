@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.31.0"
+__version__ = "0.31.1"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -344,4 +344,6 @@ VERSION_NOTES = {
               "cualquier otra ubicación. Nuevo también: el Abogado puede "
               "capturar 'Observaciones' por fila, que viajan hasta el "
               "reporte.",
+    "0.31.1": "Se reemplazó el ícono del programa (ventana, barra de "
+              "tareas y el propio .exe) por el escudo institucional.",
 }

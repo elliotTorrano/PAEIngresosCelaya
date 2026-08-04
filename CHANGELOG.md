@@ -1,5 +1,10 @@
 # Historial de versiones — Sistema PAE
 
+## 0.31.1
+
+- Se reemplazó el ícono del programa (ventana, barra de tareas y el
+  propio .exe) por el escudo institucional (`resources/default_icon.ico`).
+
 ## 0.31.0
 
 - **Nuevo rol "Reporteador"**, autenticado con certificado (como el Agente
