@@ -48,6 +48,51 @@ def test_migration_adds_must_change_password_column(tmp_path, monkeypatch):
         connection_module._connection = None
 
 
+def test_migration_adds_export_timestamp_columns(tmp_path, monkeypatch):
+    db_file = tmp_path / "legacy.db"
+    monkeypatch.setattr(connection_module, "db_path", lambda: db_file)
+    connection_module._connection = None
+
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+    conn.execute("INSERT INTO schema_version (version) VALUES (1)")
+    conn.execute(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            role TEXT NOT NULL,
+            full_name TEXT NOT NULL,
+            email TEXT,
+            auth_type TEXT NOT NULL,
+            password_hash TEXT,
+            password_salt TEXT,
+            cert_public_pem TEXT,
+            cert_serial TEXT,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    try:
+        ensure_schema()
+
+        conn = connection_module.get_connection()
+        for table in ("requerimiento_batches", "mandamiento_batches"):
+            columns = [row["name"] for row in conn.execute(f"PRAGMA table_info({table})")]
+            assert "agente_exported_at" in columns
+            assert "abogado_exported_at" in columns
+
+        version = conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+        assert version == CURRENT_VERSION
+    finally:
+        connection_module._connection = None
+
+
 def test_migration_creates_backup_before_altering(tmp_path, monkeypatch):
     db_file = tmp_path / "legacy.db"
     monkeypatch.setattr(connection_module, "db_path", lambda: db_file)

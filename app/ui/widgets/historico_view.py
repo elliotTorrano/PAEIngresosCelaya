@@ -1,7 +1,9 @@
-"""Histórico local de archivos cargados, para Agente del PAE y Abogado --
-lee directamente `imported_files`/`mandamiento_imported_files` de esta misma
-máquina (a diferencia de la Trazabilidad del Súper/Admin, que importa el
-pae.db de OTRA máquina). Una pestaña por tipo de documento."""
+"""Histórico local de archivos cargados y exportados, para Agente del PAE y
+Abogado -- lee directamente `imported_files`/`mandamiento_imported_files` y
+`requerimiento_batches`/`mandamiento_batches` de esta misma máquina (a
+diferencia de la Trazabilidad del Súper/Admin, que importa el pae.db de
+OTRA máquina). Una pestaña por tipo de documento x dirección (importado/
+exportado)."""
 
 from __future__ import annotations
 
@@ -51,6 +53,29 @@ def _build_table(headers: list[str], rows, other_key: str) -> QTableWidget:
     return table
 
 
+def _build_export_table(
+    headers: list[str], rows, path_key: str, exported_at_key: str, other_key: str
+) -> QTableWidget:
+    table = QTableWidget(0, len(headers))
+    table.setHorizontalHeaderLabels(headers)
+    table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+    table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+    table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+    table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+    for row in rows:
+        r = table.rowCount()
+        table.insertRow(r)
+        path = row[path_key]
+        filename_item = QTableWidgetItem(Path(path).name if path else "")
+        filename_item.setData(Qt.ItemDataRole.UserRole, path)
+        table.setItem(r, 0, filename_item)
+        table.setItem(r, 1, QTableWidgetItem(str(row["row_count"])))
+        table.setItem(r, 2, QTableWidgetItem(row[other_key] or ""))
+        exported_at = row[exported_at_key]
+        table.setItem(r, 3, QTableWidgetItem(format_local_datetime(exported_at) if exported_at else ""))
+    return table
+
+
 class HistoricoView(QWidget):
     def __init__(self, user: User, parent=None):
         super().__init__(parent)
@@ -60,21 +85,35 @@ class HistoricoView(QWidget):
         other_key = "abogado_nombre" if is_agente else "agente_nombre"
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Archivos que ha cargado en esta computadora:"))
+        layout.addWidget(QLabel("Archivos que ha cargado y exportado en esta computadora:"))
 
         if is_agente:
             rows_req = req_repo.list_imported_files_for_agente(user.id)
             rows_mand = mand_repo.list_imported_files_for_agente(user.id)
+            exported_req = req_repo.list_exported_batches_for_agente(user.id)
+            exported_mand = mand_repo.list_exported_batches_for_agente(user.id)
+            path_key, exported_at_key = "exported_agente_path", "agente_exported_at"
         else:
             rows_req = req_repo.list_imported_files_for_abogado(user.id)
             rows_mand = mand_repo.list_imported_files_for_abogado(user.id)
+            exported_req = req_repo.list_exported_batches_for_abogado(user.id)
+            exported_mand = mand_repo.list_exported_batches_for_abogado(user.id)
+            path_key, exported_at_key = "exported_abogado_path", "abogado_exported_at"
 
         self.table_requerimiento = _build_table(headers, rows_req, other_key)
         self.table_mandamiento = _build_table(headers, rows_mand, other_key)
+        self.table_requerimiento_exportados = _build_export_table(
+            headers, exported_req, path_key, exported_at_key, other_key
+        )
+        self.table_mandamiento_exportados = _build_export_table(
+            headers, exported_mand, path_key, exported_at_key, other_key
+        )
 
         self.tabs = QTabWidget()
-        self.tabs.addTab(self.table_requerimiento, "Requerimiento")
-        self.tabs.addTab(self.table_mandamiento, "Mandamiento")
+        self.tabs.addTab(self.table_requerimiento, "Requerimientos importados")
+        self.tabs.addTab(self.table_requerimiento_exportados, "Requerimientos exportados")
+        self.tabs.addTab(self.table_mandamiento, "Mandamientos importados")
+        self.tabs.addTab(self.table_mandamiento_exportados, "Mandamientos exportados")
         layout.addWidget(self.tabs)
 
         open_location_btn = QPushButton("Abrir ubicación del archivo")

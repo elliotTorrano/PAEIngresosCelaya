@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.33.0"
+__version__ = "0.34.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -362,4 +362,10 @@ VERSION_NOTES = {
               "todo lo demás -- certificados, contraseñas y expedientes "
               "siguen siendo 100% locales; solo viaja lo necesario para que "
               "la cuenta exista y pueda iniciar sesión por primera vez.",
+    "0.34.0": "El menú Histórico (Agente del PAE y Abogado) ahora también "
+              "muestra los archivos EXPORTADOS, no sólo los importados: "
+              "nombre del archivo, cuántas filas llevaba, la contraparte y "
+              "la fecha y hora exactas de la exportación, con el mismo "
+              "botón 'Abrir ubicación del archivo' para poder confirmar de "
+              "un vistazo que un envío salió bien.",
 }

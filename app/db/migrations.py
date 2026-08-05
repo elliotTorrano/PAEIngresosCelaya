@@ -8,7 +8,7 @@ from pathlib import Path
 from app.db.connection import get_connection
 
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
-CURRENT_VERSION = 13
+CURRENT_VERSION = 14
 
 # Migraciones incrementales para bases de datos creadas con una versión anterior
 # del esquema. schema.sql ya crea las tablas nuevas "desde cero" con todo esto
@@ -337,6 +337,17 @@ _MIGRATIONS: dict[int, str | list[str]] = {
         )""",
         "CREATE INDEX IF NOT EXISTS idx_reporte_requerimientos_folio ON reporte_requerimientos_rows(folio)",
         "CREATE INDEX IF NOT EXISTS idx_reporte_mandamientos_folio ON reporte_mandamientos_rows(folio)",
+    ],
+    14: [
+        # Timestamp propio del momento de exportación -- created_at/updated_at
+        # del lote no sirven porque se pisan con cambios posteriores (editar,
+        # finalizar, reenviar). Lo llena set_batch_export_path() en
+        # app/db/repositories/requerimientos.py y mandamientos.py, y lo
+        # muestra el Histórico (pestañas "exportados").
+        "ALTER TABLE requerimiento_batches ADD COLUMN agente_exported_at TEXT",
+        "ALTER TABLE requerimiento_batches ADD COLUMN abogado_exported_at TEXT",
+        "ALTER TABLE mandamiento_batches ADD COLUMN agente_exported_at TEXT",
+        "ALTER TABLE mandamiento_batches ADD COLUMN abogado_exported_at TEXT",
     ],
 }
 

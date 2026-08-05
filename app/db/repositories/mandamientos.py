@@ -227,6 +227,38 @@ def list_imported_files_for_abogado(abogado_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def list_exported_batches_for_agente(agente_id: int) -> list[sqlite3.Row]:
+    conn = get_connection()
+    return conn.execute(
+        """
+        SELECT b.id, b.exported_agente_path, b.agente_exported_at,
+               bu.full_name AS abogado_nombre,
+               (SELECT COUNT(*) FROM mandamiento_rows WHERE batch_id = b.id) AS row_count
+        FROM mandamiento_batches b
+        LEFT JOIN users bu ON bu.id = b.abogado_id
+        WHERE b.agente_id = ? AND b.exported_agente_path IS NOT NULL
+        ORDER BY b.agente_exported_at DESC
+        """,
+        (agente_id,),
+    ).fetchall()
+
+
+def list_exported_batches_for_abogado(abogado_id: int) -> list[sqlite3.Row]:
+    conn = get_connection()
+    return conn.execute(
+        """
+        SELECT b.id, b.exported_abogado_path, b.abogado_exported_at,
+               au.full_name AS agente_nombre,
+               (SELECT COUNT(*) FROM mandamiento_rows WHERE batch_id = b.id) AS row_count
+        FROM mandamiento_batches b
+        LEFT JOIN users au ON au.id = b.agente_id
+        WHERE b.abogado_id = ? AND b.exported_abogado_path IS NOT NULL
+        ORDER BY b.abogado_exported_at DESC
+        """,
+        (abogado_id,),
+    ).fetchall()
+
+
 def set_batch_status(batch_id: int, status: str) -> None:
     conn = get_connection()
     conn.execute(
@@ -257,12 +289,14 @@ def set_batch_export_path(
     conn = get_connection()
     if agente_path is not None:
         conn.execute(
-            "UPDATE mandamiento_batches SET exported_agente_path = ?, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE mandamiento_batches SET exported_agente_path = ?, "
+            "agente_exported_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
             (agente_path, batch_id),
         )
     if abogado_path is not None:
         conn.execute(
-            "UPDATE mandamiento_batches SET exported_abogado_path = ?, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE mandamiento_batches SET exported_abogado_path = ?, "
+            "abogado_exported_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
             (abogado_path, batch_id),
         )
     if agente_uuid is not None or agente_hash is not None:

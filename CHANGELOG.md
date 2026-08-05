@@ -1,5 +1,18 @@
 # Historial de versiones — Sistema PAE
 
+## 0.34.0
+
+- **Histórico: nuevas pestañas de archivos EXPORTADOS** (Agente del PAE y
+  Abogado, para Requerimiento y Mandamiento) -- junto a las pestañas de
+  "importados" que ya existían, ahora se puede ver de un vistazo qué se
+  exportó, cuándo exactamente y a quién, para confirmar que un envío salió
+  bien. Reusa el mismo botón "Abrir ubicación del archivo".
+- El dato ya existía parcialmente en la base (`exported_agente_path`/
+  `exported_abogado_path`); lo nuevo es un timestamp propio y confiable del
+  momento de cada exportación (`agente_exported_at`/`abogado_exported_at`,
+  migración v14) -- antes sólo había `created_at`/`updated_at`, que se
+  pisaban con cambios posteriores del lote (editar, finalizar, reenviar).
+
 ## 0.33.0
 
 - **Sincronización silenciosa de usuarios (Agente/Abogado/Reporteador)**:

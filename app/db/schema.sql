@@ -53,6 +53,11 @@ CREATE TABLE IF NOT EXISTS requerimiento_batches (
     agente_export_hash    TEXT,
     abogado_export_uuid   TEXT,
     abogado_export_hash   TEXT,
+    -- Momento exacto de cada exportación real -- ver set_batch_export_path()
+    -- en app/db/repositories/requerimientos.py. created_at/updated_at no
+    -- sirven para esto porque updated_at se pisa con cambios posteriores.
+    agente_exported_at    TEXT,
+    abogado_exported_at   TEXT,
     created_at            TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -133,6 +138,11 @@ CREATE TABLE IF NOT EXISTS mandamiento_batches (
     agente_export_hash    TEXT,
     abogado_export_uuid   TEXT,
     abogado_export_hash   TEXT,
+    -- Momento exacto de cada exportación real -- ver set_batch_export_path()
+    -- en app/db/repositories/mandamientos.py. created_at/updated_at no sirven
+    -- para esto porque updated_at se pisa con cambios posteriores del lote.
+    agente_exported_at    TEXT,
+    abogado_exported_at   TEXT,
     created_at            TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -80,6 +80,53 @@ def test_historico_view_shows_mandamiento_tab_separately(qapp, db):
     assert view.table_mandamiento.item(0, 0).text() == "mandamiento.xlsx"
 
 
+def test_historico_view_shows_agente_exported_batch(qapp, db):
+    agente = _make_agente()
+    abogado = _make_abogado()
+    batch_id = req_repo.create_batch(abogado_id=abogado.id, agente_id=agente.id)
+    req_repo.add_rows(batch_id, [{"folio": "1", "cta_predial": None, "contribuyente": None, "domicilio": None}])
+    req_repo.set_batch_export_path(batch_id, agente_path="/x/exportado.mcdiep")
+
+    view = HistoricoView(agente)
+
+    assert view.table_requerimiento_exportados.rowCount() == 1
+    assert view.table_requerimiento_exportados.item(0, 0).text() == "exportado.mcdiep"
+    assert view.table_requerimiento_exportados.item(0, 1).text() == "1"
+    assert view.table_requerimiento_exportados.item(0, 2).text() == "Abogado Uno"
+    assert view.table_requerimiento_exportados.item(0, 3).text() != ""
+
+
+def test_historico_view_shows_abogado_exported_batch(qapp, db):
+    agente = _make_agente()
+    abogado = _make_abogado()
+    batch_id = req_repo.create_batch(abogado_id=abogado.id, agente_id=agente.id)
+    req_repo.set_batch_export_path(batch_id, abogado_path="/x/entrega.mcdiep")
+
+    view = HistoricoView(abogado)
+
+    assert view.table_requerimiento_exportados.rowCount() == 1
+    assert view.table_requerimiento_exportados.item(0, 0).text() == "entrega.mcdiep"
+    assert view.table_requerimiento_exportados.item(0, 2).text() == "Agente Uno"
+
+
+def test_historico_view_export_tab_open_location(qapp, db, tmp_path):
+    agente = _make_agente()
+    abogado = _make_abogado()
+    exported_file = tmp_path / "exportado.mcdiep"
+    exported_file.write_text("x")
+    batch_id = req_repo.create_batch(abogado_id=abogado.id, agente_id=agente.id)
+    req_repo.set_batch_export_path(batch_id, agente_path=str(exported_file))
+
+    view = HistoricoView(agente)
+    view.tabs.setCurrentWidget(view.table_requerimiento_exportados)
+    view.table_requerimiento_exportados.selectRow(0)
+
+    with patch("app.ui.widgets.historico_view.subprocess.Popen") as mock_popen:
+        view._on_open_location()
+
+    mock_popen.assert_called_once_with(["explorer", "/select,", str(exported_file)])
+
+
 def test_historico_view_open_location_launches_explorer_when_file_exists(qapp, db, tmp_path):
     agente = _make_agente()
     abogado = _make_abogado()
