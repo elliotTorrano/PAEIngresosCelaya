@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QDialog, QGroupBox, QLabel, QLineEdit, QMessageBox
 from app.auth.passwords import hash_password, verify_password
 from app.config import AUTH_TYPE_CERTIFICADO, AUTH_TYPE_PASSWORD, is_dummy_user
 from app.db.repositories import users as users_repo
+from app.sync import user_directory
 from app.ui.widgets.certificate_confirm_dialog import CertificateConfirmDialog
 
 
@@ -158,6 +159,7 @@ class SimpleAccountView(QWidget):
 
         pwd_hash, salt = hash_password(new_password)
         users_repo.set_password(current.id, password_hash=pwd_hash, password_salt=salt, must_change_password=False)
+        user_directory.push_user(users_repo.get_by_id(current.id))
 
         self.current_password_input.clear()
         self.new_password_input.clear()

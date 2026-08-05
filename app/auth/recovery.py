@@ -26,6 +26,7 @@ from urllib.parse import quote
 from app.config import ADMIN_NOTIFICATION_EMAIL_SUBJECT
 from app.db.repositories import reset_requests as reset_requests_repo
 from app.db.repositories import users as users_repo
+from app.sync import user_directory
 
 ACTION_SET_PASSWORD = "set_password"
 ACTION_ALLOW_REENROLL = "allow_reenroll"
@@ -145,6 +146,7 @@ def apply_update_package(payload: dict) -> str:
             user.id, password_hash=payload["password_hash"], password_salt=payload["password_salt"],
             must_change_password=True,
         )
+        user_directory.push_user(users_repo.get_by_id(user.id))
         return (
             f"Se actualizó la contraseña de '{user.username}'. Al iniciar sesión con la nueva "
             "contraseña, se le pedirá establecer una definitiva."

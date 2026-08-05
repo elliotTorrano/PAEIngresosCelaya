@@ -1,6 +1,6 @@
 """Versionado semántico del programa (independiente del control de versiones del código)."""
 
-__version__ = "0.31.1"
+__version__ = "0.33.0"
 
 # Historial resumido — el detalle completo vive en CHANGELOG.md
 VERSION_NOTES = {
@@ -346,4 +346,20 @@ VERSION_NOTES = {
               "reporte.",
     "0.31.1": "Se reemplazó el ícono del programa (ventana, barra de "
               "tareas y el propio .exe) por el escudo institucional.",
+    "0.32.0": "Las cuentas de prueba (agente_dummy/abogado_dummy) ya pueden "
+              "probar de verdad 'Revisar Formato' y la 'Captura' del "
+              "Abogado, no sólo 'Generar Formato': importan un archivo "
+              "real, capturan/marcan PROCEDE en pantalla y exportan "
+              "archivos reales (.mcdiep/PDF con marca de agua, o el Excel "
+              "de revisión), todo sin escribir una sola fila en la base de "
+              "datos -- para poder hacer pruebas fidedignas con los "
+              "usuarios finales sin arriesgar datos reales.",
+    "0.33.0": "Las cuentas de Agente/Abogado/Reporteador que da de alta el "
+              "Administrador ya no requieren reinstalar el programa en la "
+              "computadora de esa persona: se sincronizan solas (de forma "
+              "silenciosa, por internet) a través de un directorio remoto "
+              "mínimo. Cada quien sigue usando su propia computadora para "
+              "todo lo demás -- certificados, contraseñas y expedientes "
+              "siguen siendo 100% locales; solo viaja lo necesario para que "
+              "la cuenta exista y pueda iniciar sesión por primera vez.",
 }

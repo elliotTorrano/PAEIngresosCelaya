@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from app.auth import dummy_accounts, first_run, session
 from app.db.migrations import ensure_schema
+from app.sync.user_directory import pull_and_apply
 from app.ui.login.login_window import LoginWindow
 from app.ui.main_window import MainWindow
 from app.ui.widgets.styles import apply_app_icon
@@ -61,6 +62,12 @@ def main() -> int:
     # súper-usuario/Administrador, a enrolar un certificado -- contra una
     # versión ya desactualizada.
     run_update_check(None)
+
+    # Igual de silencioso y best-effort que run_update_check: si no hay
+    # internet o el directorio remoto no responde, no pasa nada -- las
+    # cuentas dadas de alta desde otra instalación simplemente aparecerán
+    # en el siguiente arranque con conexión.
+    pull_and_apply()
 
     while True:
         login = LoginWindow()

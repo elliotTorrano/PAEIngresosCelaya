@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.auth.crypto_certs import verify_challenge
+from app.config import DUMMY_AGENTE_USERNAME
 from app.db.repositories import users as users_repo
 from app.db.repositories.users import User
 from app.excel_io import mcdiep_format
@@ -80,7 +81,8 @@ def parse_agente_export_file(path: Path, *, abogado: User) -> AgenteImportResult
     """Lee el archivo .mcdiep que el Agente del PAE exportó para `abogado`.
     Mismas verificaciones que requerimientos_import.py::parse_agente_export_file
     (tipo correcto, firmante con certificado registrado, firma válida,
-    destinatario correcto) -- ver ese docstring para el detalle."""
+    destinatario correcto -- con la misma excepción para el firmante
+    `agente_dummy`) -- ver ese docstring para el detalle."""
     file_bytes = path.read_bytes()
     file_hash = hashlib.sha256(file_bytes).hexdigest()
     envelope = mcdiep_format.read_envelope(path)
@@ -90,18 +92,20 @@ def parse_agente_export_file(path: Path, *, abogado: User) -> AgenteImportResult
         )
 
     signer = users_repo.get_by_username(envelope.signer_username or "")
-    if signer is None or not signer.cert_public_pem:
+    is_dummy_signer = envelope.signer_username == DUMMY_AGENTE_USERNAME
+    if signer is None or (not is_dummy_signer and not signer.cert_public_pem):
         raise McdiepVerificationError(
             f"El archivo dice estar firmado por '{envelope.signer_username}', pero esa cuenta "
             "no existe o no tiene un certificado registrado en esta instalación."
         )
 
-    signable = mcdiep_format.signable_bytes(envelope.kind, envelope.target_username, envelope.payload)
-    if not envelope.signature or not verify_challenge(signer.cert_public_pem, signable, envelope.signature):
-        raise McdiepVerificationError(
-            "La firma de este archivo no es válida: el contenido pudo haber sido alterado "
-            "después de firmarse, o el certificado del firmante ya no es el mismo."
-        )
+    if not is_dummy_signer:
+        signable = mcdiep_format.signable_bytes(envelope.kind, envelope.target_username, envelope.payload)
+        if not envelope.signature or not verify_challenge(signer.cert_public_pem, signable, envelope.signature):
+            raise McdiepVerificationError(
+                "La firma de este archivo no es válida: el contenido pudo haber sido alterado "
+                "después de firmarse, o el certificado del firmante ya no es el mismo."
+            )
 
     if envelope.target_username != abogado.username:
         raise McdiepVerificationError(

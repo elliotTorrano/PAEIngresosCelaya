@@ -54,7 +54,7 @@ def export_agente_pdf(
 
 def export_abogado_pdf(
     pdf_path: Path, *, agente: User, abogado: User, rows: list[MandamientoRow], filename: str,
-    identity: DocumentIdentity,
+    identity: DocumentIdentity, dummy: bool = False, watermark_text: str | None = None,
 ) -> None:
     """PDF que acompaña la exportación del Abogado. Ver
     app/pdf_io/requerimientos_pdf.py::export_abogado_pdf."""
@@ -71,4 +71,5 @@ def export_abogado_pdf(
         headers=HEADERS_ABOGADO, table_rows=table_rows, quien_recibe_values=[row.quien_recibe for row in rows],
         total_mode="filled", include_notificacion_counters=True, identity=identity,
         formato_titulo=FORMATO_TITULO, documento_titulo=DOCUMENTO_TITULO,
+        dummy=dummy, watermark_text=watermark_text,
     )

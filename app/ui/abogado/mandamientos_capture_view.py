@@ -82,13 +82,17 @@ def _category_for_batch(batch) -> str:
 
 
 class MandamientosCaptureView(QWidget):
-    def __init__(self, abogado_user: users_repo.User, parent=None, simulate: bool = False):
+    def __init__(self, abogado_user: users_repo.User, parent=None, simulate: bool = False, dummy: bool = False):
         super().__init__(parent)
         self.abogado_user = abogado_user
         self.simulate = simulate
+        self.dummy = dummy
         self._current_batch_id: int | None = None
         self._current_batch_finalizado: bool = False
         self._rows: list[mand_repo.MandamientoRow] = []
+        # Sólo se usan en modo dummy -- ver `_on_import`/`_on_export`.
+        self._dummy_agente: users_repo.User | None = None
+        self._dummy_exportado: bool = False
 
         layout = QVBoxLayout(self)
 
@@ -97,6 +101,17 @@ class MandamientosCaptureView(QWidget):
                 "Modo simulación: puede navegar lotes existentes y probar la captura, pero "
                 "nada de lo que haga aquí se guarda; no se pueden crear lotes nuevos."
             )
+            banner.setStyleSheet(
+                "background-color: rgba(255, 224, 138, 0.9); padding: 6px; border-radius: 4px;"
+            )
+            layout.addWidget(banner)
+        elif self.dummy:
+            banner = QLabel(
+                "Cuenta de prueba: puede importar un archivo real del Agente, capturar y "
+                "exportar (se genera un archivo real, sin certificado ni firma, con marca de "
+                "agua), pero nada queda registrado en la base de datos del programa."
+            )
+            banner.setWordWrap(True)
             banner.setStyleSheet(
                 "background-color: rgba(255, 224, 138, 0.9); padding: 6px; border-radius: 4px;"
             )
@@ -272,6 +287,38 @@ class MandamientosCaptureView(QWidget):
             return
 
         agente = result.agente
+
+        if self.dummy:
+            self._dummy_agente = agente
+            self._dummy_exportado = False
+            self._current_batch_id = -1  # sentinel: no hay lote real en la base de datos
+            self._rows = [
+                mand_repo.MandamientoRow(
+                    id=-(i + 1), batch_id=-1,
+                    folio=r.get("folio"), cta_predial=r.get("cta_predial"),
+                    contribuyente=r.get("contribuyente"),
+                    fecha_citatorio=None, recibe_citatorio=None, recibe_citatorio_nombre=None,
+                    fecha_notificacion=None, quien_recibe=None, quien_recibe_nombre=None,
+                    observaciones=None,
+                )
+                for i, r in enumerate(result.rows)
+            ]
+            self._current_batch_finalizado = False
+            self.finalize_btn.setVisible(True)
+            self.edit_btn.setVisible(False)
+            self.identity_label.setText(
+                f"Documento de prueba recibido del Agente — UUID: {result.document_uuid}  "
+                f"Hash: {result.file_hash}"
+            )
+            self._refresh_table()
+            QMessageBox.information(
+                self, "Importado (prueba)",
+                f"Se importaron {len(result.rows)} filas. No se guardó nada en la base de datos.\n\n"
+                f"Firmado por: {agente.full_name} ({agente.username}).\n\n"
+                f"UUID: {result.document_uuid}\nHash: {result.file_hash}",
+            )
+            return
+
         batch_id = mand_repo.create_batch(abogado_id=self.abogado_user.id, agente_id=agente.id)
         mand_repo.add_rows(batch_id, result.rows)
         mand_repo.record_imported_file(
@@ -406,7 +453,7 @@ class MandamientosCaptureView(QWidget):
         observaciones_edit: QLineEdit = self.table.cellWidget(table_row, COL_OBSERVACIONES)
         observaciones = observaciones_edit.text().strip() or None
 
-        if not self.simulate:
+        if not self.simulate and not self.dummy:
             mand_repo.update_row_capture(
                 row_id,
                 fecha_citatorio=fecha_citatorio,
@@ -510,7 +557,8 @@ class MandamientosCaptureView(QWidget):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        mand_repo.set_batch_finalizado(self._current_batch_id, True)
+        if not self.dummy:
+            mand_repo.set_batch_finalizado(self._current_batch_id, True)
         self._current_batch_finalizado = True
         self.finalize_btn.setVisible(False)
         self.edit_btn.setVisible(True)
@@ -529,9 +577,14 @@ class MandamientosCaptureView(QWidget):
 
         # Si el lote YA se exportó antes, desbloquearlo para editar no
         # actualiza solo el archivo que ya se entregó -- hay que avisarlo
-        # explícitamente antes de permitirlo.
-        batch = mand_repo.get_batch(self._current_batch_id)
-        if batch is not None and batch["status"] == BATCH_STATUS_EXPORTADO:
+        # explícitamente antes de permitirlo. En modo dummy no hay lote
+        # real que consultar -- se usa el mismo aviso a partir de
+        # `self._dummy_exportado`.
+        ya_exportado = self._dummy_exportado if self.dummy else False
+        if not self.dummy:
+            batch = mand_repo.get_batch(self._current_batch_id)
+            ya_exportado = batch is not None and batch["status"] == BATCH_STATUS_EXPORTADO
+        if ya_exportado:
             proceed = QMessageBox.warning(
                 self, "Lote ya exportado",
                 "Este lote ya se exportó anteriormente. Si edita la captura ahora, el "
@@ -544,7 +597,8 @@ class MandamientosCaptureView(QWidget):
             if proceed != QMessageBox.StandardButton.Yes:
                 return
 
-        mand_repo.set_batch_finalizado(self._current_batch_id, False)
+        if not self.dummy:
+            mand_repo.set_batch_finalizado(self._current_batch_id, False)
         self._current_batch_finalizado = False
         self.finalize_btn.setVisible(True)
         self.edit_btn.setVisible(False)
@@ -594,17 +648,29 @@ class MandamientosCaptureView(QWidget):
         if choice == "cancel":
             return
 
-        batch = mand_repo.get_batch(self._current_batch_id)
-        agente = users_repo.get_by_id(batch["agente_id"])
+        if self.dummy:
+            agente = self._dummy_agente
+        else:
+            batch = mand_repo.get_batch(self._current_batch_id)
+            agente = users_repo.get_by_id(batch["agente_id"])
 
-        document_uuid = mandamientos_pdf.new_document_uuid()
-        envelope = build_abogado_envelope(rows_to_export, document_uuid=document_uuid)
-        mcdiep_bytes = mcdiep_format.envelope_bytes(envelope)
-        identity = mandamientos_pdf.compute_identity(mcdiep_bytes, document_uuid=document_uuid)
-        filename = mandamientos_pdf.suggested_filename(
-            agente_nombre=agente.full_name, abogado_nombre=self.abogado_user.full_name,
-            identity=identity, extension=mcdiep_format.EXTENSION,
-        )
+        if self.dummy:
+            identity = mandamientos_pdf.dummy_identity()
+            envelope = build_abogado_envelope(rows_to_export, document_uuid=identity.uuid)
+            mcdiep_bytes = mcdiep_format.envelope_bytes(envelope)
+            filename = mandamientos_pdf.suggested_dummy_filename(
+                agente_nombre=agente.full_name, abogado_nombre=self.abogado_user.full_name,
+                extension=mcdiep_format.EXTENSION,
+            )
+        else:
+            document_uuid = mandamientos_pdf.new_document_uuid()
+            envelope = build_abogado_envelope(rows_to_export, document_uuid=document_uuid)
+            mcdiep_bytes = mcdiep_format.envelope_bytes(envelope)
+            identity = mandamientos_pdf.compute_identity(mcdiep_bytes, document_uuid=document_uuid)
+            filename = mandamientos_pdf.suggested_filename(
+                agente_nombre=agente.full_name, abogado_nombre=self.abogado_user.full_name,
+                identity=identity, extension=mcdiep_format.EXTENSION,
+            )
         folder = QFileDialog.getExistingDirectory(
             self, "Elegir carpeta para guardar el archivo exportado", str(exports_dir())
         )
@@ -622,21 +688,25 @@ class MandamientosCaptureView(QWidget):
                 return
 
         output_path.write_bytes(mcdiep_bytes)
-        mand_repo.set_batch_export_path(
-            self._current_batch_id, abogado_path=str(output_path),
-            abogado_uuid=identity.uuid, abogado_hash=identity.file_hash,
-        )
-        mand_repo.set_batch_status(self._current_batch_id, BATCH_STATUS_EXPORTADO)
+        if not self.dummy:
+            mand_repo.set_batch_export_path(
+                self._current_batch_id, abogado_path=str(output_path),
+                abogado_uuid=identity.uuid, abogado_hash=identity.file_hash,
+            )
+            mand_repo.set_batch_status(self._current_batch_id, BATCH_STATUS_EXPORTADO)
         pdf_path = output_path.with_suffix(".pdf")
         mandamientos_pdf.export_abogado_pdf(
             pdf_path, agente=agente, abogado=self.abogado_user, rows=rows_to_export,
             filename=output_path.name, identity=identity,
+            dummy=self.dummy, watermark_text=(f"PAE PRUEBA - {self.abogado_user.full_name}" if self.dummy else None),
         )
 
         # Los datos ya exportados quedan bloqueados de inmediato -- igual que
         # "Finalizar captura" -- para que no se editen por accidente después
         # de entregados; "Editar captura" los desbloquea (con advertencia).
-        mand_repo.set_batch_finalizado(self._current_batch_id, True)
+        if not self.dummy:
+            mand_repo.set_batch_finalizado(self._current_batch_id, True)
+        self._dummy_exportado = True
         self._current_batch_finalizado = True
         self.finalize_btn.setVisible(False)
         self.edit_btn.setVisible(True)

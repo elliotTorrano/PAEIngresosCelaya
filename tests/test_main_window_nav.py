@@ -193,7 +193,7 @@ def test_show_colores_tab_for_agente_is_interface_only(qapp, db):
 
 # --- Cuentas de prueba (agente_dummy / abogado_dummy) ---------------------------------
 
-def test_dummy_agente_window_marks_title_and_forces_dummy_or_simulate(qapp, db):
+def test_dummy_agente_window_marks_title_and_forces_dummy(qapp, db):
     ensure_dummy_accounts()
     dummy = users_repo.get_by_username(DUMMY_AGENTE_USERNAME)
     window = MainWindow(dummy)
@@ -213,18 +213,23 @@ def test_dummy_agente_window_marks_title_and_forces_dummy_or_simulate(qapp, db):
     assert generar_mand.simulate is False
     assert generar_mand.dummy is True
 
-    # Revisar Formato sigue en modo simulación (no requiere lote real).
+    # Revisar Formato: mismo modo dummy que Generar Formato -- importa/exporta
+    # de verdad, sin escribir en la base de datos (ver #206).
     window._show_revisar_formato_tab()
-    assert window._formato_widgets["revisar_formato"].simulate is True
+    revisar = window._formato_widgets["revisar_formato"]
+    assert revisar.simulate is False
+    assert revisar.dummy is True
 
     window._show_revisar_mandamiento_tab()
-    assert window._formato_widgets["revisar_mandamiento"].simulate is True
+    revisar_mand = window._formato_widgets["revisar_mandamiento"]
+    assert revisar_mand.simulate is False
+    assert revisar_mand.dummy is True
 
     window._show_colores_tab()
     assert window._otros_widgets["colores"].allow_save is False
 
 
-def test_dummy_abogado_window_forces_simulate(qapp, db):
+def test_dummy_abogado_window_forces_dummy(qapp, db):
     ensure_dummy_accounts()
     dummy = users_repo.get_by_username(DUMMY_ABOGADO_USERNAME)
     window = MainWindow(dummy)
@@ -232,10 +237,14 @@ def test_dummy_abogado_window_forces_simulate(qapp, db):
     assert window.is_dummy is True
 
     window._show_requerimientos_tab()
-    assert window._formato_widgets["requerimientos"].simulate is True
+    requerimientos = window._formato_widgets["requerimientos"]
+    assert requerimientos.simulate is False
+    assert requerimientos.dummy is True
 
     window._show_mandamientos_tab()
-    assert window._formato_widgets["mandamientos"].simulate is True
+    mandamientos = window._formato_widgets["mandamientos"]
+    assert mandamientos.simulate is False
+    assert mandamientos.dummy is True
 
 
 def test_real_agente_window_is_not_dummy(qapp, db):
@@ -269,6 +278,7 @@ def test_admin_keeps_direct_requerimientos_tab_plus_welcome(qapp, db):
         "Solicitudes de reset",
         "Apariencia",
         "Colores",
+        "Sincronización",
         "Datos de cuenta",
         "Trazabilidad",
     ]

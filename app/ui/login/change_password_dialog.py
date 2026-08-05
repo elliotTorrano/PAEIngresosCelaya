@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QDialog, QLabel, QLineEdit, QMessageBox, QPushButt
 from app.auth.passwords import hash_password
 from app.config import window_title
 from app.db.repositories import users as users_repo
+from app.sync import user_directory
 from app.ui.widgets.styles import apply_base_style
 
 
@@ -53,4 +54,5 @@ class ChangePasswordDialog(QDialog):
 
         pwd_hash, salt = hash_password(password)
         users_repo.set_password(self.user.id, password_hash=pwd_hash, password_salt=salt, must_change_password=False)
+        user_directory.push_user(users_repo.get_by_id(self.user.id))
         self.accept()

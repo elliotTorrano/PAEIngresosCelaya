@@ -136,12 +136,16 @@ def test_abogado_change_password_success(qapp, db):
     view.new_password_input.setText("nueva-clave-6")
     view.confirm_password_input.setText("nueva-clave-6")
 
-    with patch("app.ui.widgets.simple_account_view.QMessageBox.information") as mock_info:
+    with patch("app.ui.widgets.simple_account_view.QMessageBox.information") as mock_info, patch(
+        "app.ui.widgets.simple_account_view.user_directory.push_user"
+    ) as mock_push:
         view._on_change_password()
 
     mock_info.assert_called_once()
     refreshed = users_repo.get_by_id(abogado.id)
     assert verify_password("nueva-clave-6", refreshed.password_hash, refreshed.password_salt)
+    mock_push.assert_called_once()
+    assert mock_push.call_args[0][0].username == "abogado1"
 
 
 def test_abogado_change_password_mismatch(qapp, db):

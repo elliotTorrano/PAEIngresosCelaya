@@ -95,11 +95,13 @@ class MainWindow(QMainWindow):
             from app.ui.admin.user_management_view import UserManagementView
             from app.ui.admin.appearance_settings_view import AppearanceSettingsView
             from app.ui.admin.reset_requests_view import ResetRequestsView
+            from app.ui.admin.sync_settings_view import SyncSettingsView
 
             self._add_permanent_tab(UserManagementView(self.user), "Usuarios")
             self._add_permanent_tab(ResetRequestsView(self.user), "Solicitudes de reset")
             self._add_permanent_tab(AppearanceSettingsView(self.user), "Apariencia")
             self._add_permanent_tab(ColorSettingsView(self.user), "Colores")
+            self._add_permanent_tab(SyncSettingsView(self.user), "Sincronización")
             self._add_permanent_tab(AccountSettingsView(self.user), "Datos de cuenta")
             self._add_permanent_tab(AuditView(self.user), "Trazabilidad")
 
@@ -164,7 +166,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.abogado.requerimientos_capture_view import RequerimientosCaptureView
 
-            widget = RequerimientosCaptureView(self.user, simulate=self.is_dummy)
+            widget = RequerimientosCaptureView(self.user, dummy=self.is_dummy)
             self.tabs.addTab(widget, "Formato de Requerimientos (Abogado)")
             self._formato_widgets["requerimientos"] = widget
         self.tabs.setCurrentWidget(widget)
@@ -184,7 +186,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.agente.requerimientos_revision_view import RequerimientosRevisionView
 
-            widget = RequerimientosRevisionView(self.user, simulate=self.is_dummy)
+            widget = RequerimientosRevisionView(self.user, dummy=self.is_dummy)
             widget.archivo_cambiado.connect(
                 lambda filename, w=widget: self._on_revision_filename_changed(w, filename)
             )
@@ -217,7 +219,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.agente.mandamientos_revision_view import MandamientosRevisionView
 
-            widget = MandamientosRevisionView(self.user, simulate=self.is_dummy)
+            widget = MandamientosRevisionView(self.user, dummy=self.is_dummy)
             widget.archivo_cambiado.connect(
                 lambda filename, w=widget: self._on_revision_filename_changed(w, filename)
             )
@@ -232,7 +234,7 @@ class MainWindow(QMainWindow):
         if widget is None or self.tabs.indexOf(widget) == -1:
             from app.ui.abogado.mandamientos_capture_view import MandamientosCaptureView
 
-            widget = MandamientosCaptureView(self.user, simulate=self.is_dummy)
+            widget = MandamientosCaptureView(self.user, dummy=self.is_dummy)
             self.tabs.addTab(widget, "Formato de Mandamientos (Abogado)")
             self._formato_widgets["mandamientos"] = widget
         self.tabs.setCurrentWidget(widget)

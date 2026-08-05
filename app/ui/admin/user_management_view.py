@@ -28,6 +28,7 @@ from app.config import (
     ROLE_REPORTEADOR,
 )
 from app.db.repositories import users as users_repo
+from app.sync import user_directory
 
 
 class UserManagementView(QWidget):
@@ -35,11 +36,34 @@ class UserManagementView(QWidget):
         super().__init__(parent)
         self.admin_user = admin_user
 
-        layout = QHBoxLayout(self)
-        layout.addWidget(self._build_administrador_box())
-        layout.addWidget(self._build_role_box("Agentes del PAE", ROLE_AGENTE_PAE, with_password=False))
-        layout.addWidget(self._build_role_box("Abogados", ROLE_ABOGADO, with_password=True))
-        layout.addWidget(self._build_role_box("Reporteadores", ROLE_REPORTEADOR, with_password=False))
+        outer_layout = QVBoxLayout(self)
+
+        boxes_layout = QHBoxLayout()
+        boxes_layout.addWidget(self._build_administrador_box())
+        boxes_layout.addWidget(self._build_role_box("Agentes del PAE", ROLE_AGENTE_PAE, with_password=False))
+        boxes_layout.addWidget(self._build_role_box("Abogados", ROLE_ABOGADO, with_password=True))
+        boxes_layout.addWidget(self._build_role_box("Reporteadores", ROLE_REPORTEADOR, with_password=False))
+        outer_layout.addLayout(boxes_layout)
+
+        sync_btn = QPushButton("Sincronizar ahora")
+        sync_btn.setToolTip(
+            "Sube al directorio remoto todas las cuentas de Agente/Abogado/"
+            "Reporteador -- sirve para reintentar si algún alta falló por falta "
+            "de conexión, o para las cuentas creadas antes de esta función."
+        )
+        sync_btn.clicked.connect(self._on_sync_now)
+        outer_layout.addWidget(sync_btn)
+
+    def _on_sync_now(self) -> None:
+        for role in (ROLE_AGENTE_PAE, ROLE_ABOGADO, ROLE_REPORTEADOR):
+            for u in users_repo.list_by_role(role, active_only=False):
+                user_directory.push_user(u)
+        QMessageBox.information(
+            self, "Sincronización",
+            "Se intentó subir todas las cuentas al directorio remoto. Si no hay "
+            "conexión o el token de escritura no está configurado, no pasa nada -- "
+            "se puede volver a intentar en cualquier momento.",
+        )
 
     def _build_administrador_box(self) -> QGroupBox:
         box = QGroupBox("Administrador")
@@ -127,18 +151,19 @@ class UserManagementView(QWidget):
                     QMessageBox.warning(self, "Contraseña inválida", "La contraseña debe tener al menos 6 caracteres.")
                     return
                 pwd_hash, salt = hash_password(password)
-                users_repo.create_user(
+                new_user = users_repo.create_user(
                     username=username, role=role, full_name=full_name, email=email,
                     auth_type=AUTH_TYPE_PASSWORD, password_hash=pwd_hash, password_salt=salt,
                     must_change_password=True,
                 )
                 password_input.clear()
             else:
-                users_repo.create_user(
+                new_user = users_repo.create_user(
                     username=username, role=role, full_name=full_name, email=email,
                     auth_type=AUTH_TYPE_CERTIFICADO,
                 )
 
+            user_directory.push_user(new_user)
             username_input.clear()
             fullname_input.clear()
             email_input.clear()

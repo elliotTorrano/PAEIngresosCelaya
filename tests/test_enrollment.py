@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from app.auth.enrollment import enroll_certificate
 from app.auth.recovery_codes import verify_recovery_code
 from app.config import AUTH_TYPE_CERTIFICADO, ROLE_ADMINISTRADOR, ROLE_AGENTE_PAE, ROLE_SUPERUSUARIO
@@ -102,6 +104,21 @@ def test_reenroll_missing_previous_file_does_not_raise(db, tmp_path):
     enroll_certificate(refreshed, password="clave-2", save_path=second_path)
 
     assert second_path.exists()
+
+
+def test_enroll_certificate_pushes_updated_user_to_remote_directory(db, tmp_path):
+    agente = users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente", email="ag@a.com",
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+
+    with patch("app.auth.enrollment.user_directory.push_user") as mock_push:
+        enroll_certificate(agente, password="clave-segura", save_path=tmp_path / "agente1.pfx")
+
+    mock_push.assert_called_once()
+    pushed_user = mock_push.call_args[0][0]
+    assert pushed_user.username == "agente1"
+    assert pushed_user.cert_public_pem is not None
 
 
 def test_reenroll_rotates_recovery_code(db, tmp_path):

@@ -472,13 +472,15 @@ def export_agente_pdf(
 
 def export_abogado_pdf(
     pdf_path: Path, *, agente: User, abogado: User, rows: list[RequerimientoRow], filename: str,
-    identity: DocumentIdentity,
+    identity: DocumentIdentity, dummy: bool = False, watermark_text: str | None = None,
 ) -> None:
     """PDF que acompaña la exportación del Abogado (export_captured) -- ya
     con la captura de citatorio y notificación. El total de documentos a
     entregar sólo cuenta las filas con valor en QUIÉN RECIBE. Sin firma
     digital: el Abogado se autentica con contraseña, no tiene certificado
-    (`identity` debe venir de `compute_identity(..., private_key=None)`)."""
+    (`identity` debe venir de `compute_identity(..., private_key=None)`).
+    `dummy`/`watermark_text`: exportaciones de prueba de la cuenta
+    abogado_dummy -- ver `dummy_identity`."""
     table_rows = [
         [
             row.folio or "", row.cta_predial or "", row.contribuyente or "", row.domicilio or "",
@@ -491,4 +493,5 @@ def export_abogado_pdf(
         pdf_path, agente_nombre=agente.full_name, abogado_nombre=abogado.full_name, filename=filename,
         headers=HEADERS_ABOGADO, table_rows=table_rows, quien_recibe_values=[row.quien_recibe for row in rows],
         total_mode="filled", include_notificacion_counters=True, identity=identity,
+        dummy=dummy, watermark_text=watermark_text,
     )

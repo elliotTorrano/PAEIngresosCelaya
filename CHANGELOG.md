@@ -1,5 +1,48 @@
 # Historial de versiones — Sistema PAE
 
+## 0.33.0
+
+- **Sincronización silenciosa de usuarios (Agente/Abogado/Reporteador)**:
+  cuando el Administrador/Súper-usuario da de alta una cuenta, ya no hace
+  falta reinstalar el programa en la computadora de esa persona para que
+  funcione ahí -- se sube sola, por internet, a un directorio remoto mínimo
+  (usando la API HTTP pública de Turso, sin depender de ninguna red local,
+  pensado para abogados que no están en la misma LAN que el resto). Cada
+  instalación jala ese directorio de forma silenciosa al arrancar (mismo
+  patrón, mismo momento, que el chequeo de actualizaciones) y crea la
+  cuenta localmente si no existe todavía.
+- **Nada de expedientes ni certificados viaja a la nube**: solo un
+  directorio mínimo (usuario, rol, nombre, correo, contraseña inicial si
+  aplica). El certificado (llave privada) se sigue generando 100% local en
+  el primer inicio de sesión de cada quien, exactamente como antes -- solo
+  la llave PÚBLICA se sube, y únicamente como dato informativo (para poder
+  saber, sin ir máquina por máquina, si alguien ya enroló su certificado o
+  cambió su contraseña inicial); nunca se aplica de vuelta a ninguna
+  instalación.
+- **Credenciales asimétricas por seguridad**: todas las instalaciones
+  llevan integrado un token de Turso de SOLO LECTURA; el token con permiso
+  de escritura lo pega el Administrador una sola vez en la nueva pestaña
+  **"Sincronización"**, y se guarda solo en esa computadora -- nunca viaja
+  con el instalador. Esa misma pestaña (y la de "Usuarios") tiene un botón
+  **"Sincronizar ahora"** para reintentar manualmente o subir de una vez
+  las cuentas creadas antes de esta función.
+
+## 0.32.0
+
+- **Cuentas de prueba (agente_dummy/abogado_dummy): "Revisar Formato" y la
+  "Captura" del Abogado ahora prueban de verdad**, igual que ya hacía
+  "Generar Formato" -- importan un archivo real (`.mcdiep`), capturan o
+  marcan PROCEDE/NO PROCEDE en pantalla, finalizan/desbloquean el lote, y
+  exportan archivos reales (`.mcdiep`+PDF con marca de agua e identidad de
+  prueba, o el Excel de revisión), **sin escribir una sola fila en la base
+  de datos** -- para poder hacer pruebas fidedignas de punta a punta
+  (generar → revisar → capturar → exportar) con usuarios finales, sin
+  arriesgar datos reales.
+- El archivo de prueba que exporta `agente_dummy` (sin certificado, sin
+  firmar) ahora sí puede importarse: se añadió una excepción estrecha en la
+  verificación de firma para ese firmante exacto -- el resto de las
+  cuentas siguen exigiendo certificado y firma válidos como siempre.
+
 ## 0.31.1
 
 - Se reemplazó el ícono del programa (ventana, barra de tareas y el

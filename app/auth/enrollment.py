@@ -7,6 +7,7 @@ from pathlib import Path
 from app.auth.crypto_certs import generate_certificate_bundle
 from app.auth.recovery_codes import ROLES_WITH_RECOVERY_CODE, generate_recovery_code, hash_recovery_code
 from app.db.repositories import users as users_repo
+from app.sync import user_directory
 
 
 def enroll_certificate(user: users_repo.User, *, password: str, save_path: Path) -> str | None:
@@ -31,6 +32,7 @@ def enroll_certificate(user: users_repo.User, *, password: str, save_path: Path)
     users_repo.set_certificate(
         user.id, cert_public_pem=cert_public_pem, cert_serial=cert_serial, cert_file_path=str(save_path)
     )
+    user_directory.push_user(users_repo.get_by_id(user.id))
 
     if previous_path:
         old_path = Path(previous_path)

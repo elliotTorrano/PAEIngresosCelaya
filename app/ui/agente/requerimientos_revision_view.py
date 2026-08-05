@@ -53,11 +53,17 @@ class RequerimientosRevisionView(QWidget):
     # pueda reflejarlo en su título -- ver MainWindow._show_revisar_formato_tab.
     archivo_cambiado = Signal(str)
 
-    def __init__(self, agente_user: users_repo.User, parent=None, simulate: bool = False):
+    def __init__(self, agente_user: users_repo.User, parent=None, simulate: bool = False, dummy: bool = False):
         super().__init__(parent)
         self.agente_user = agente_user
         self.simulate = simulate
+        self.dummy = dummy
         self._current_import_id: int | None = None
+        # Filas actualmente mostradas en la tabla -- en modo real se llenan
+        # desde la base de datos al abrir un archivo importado (`_load_import`);
+        # en modo dummy son la única fuente de verdad (nunca hay nada en la
+        # base de datos que leer).
+        self._current_rows: list[revisiones_repo.RevisionRow] = []
 
         layout = QVBoxLayout(self)
 
@@ -66,6 +72,17 @@ class RequerimientosRevisionView(QWidget):
                 "Modo simulación: puede navegar archivos ya importados y probar el flujo, "
                 "pero nada de lo que haga aquí se guarda; no se pueden importar archivos nuevos."
             )
+            banner.setStyleSheet(
+                "background-color: rgba(255, 224, 138, 0.9); padding: 6px; border-radius: 4px;"
+            )
+            layout.addWidget(banner)
+        elif self.dummy:
+            banner = QLabel(
+                "Cuenta de prueba: puede importar una captura real del Abogado y probar el "
+                "flujo completo (exporta un Excel real de revisión), pero nada queda "
+                "registrado en la base de datos del programa."
+            )
+            banner.setWordWrap(True)
             banner.setStyleSheet(
                 "background-color: rgba(255, 224, 138, 0.9); padding: 6px; border-radius: 4px;"
             )
@@ -186,8 +203,8 @@ class RequerimientosRevisionView(QWidget):
 
     def _load_import(self, revision_import_id: int) -> None:
         self._current_import_id = revision_import_id
-        rows = revisiones_repo.list_revision_rows_for_import(revision_import_id)
-        filename = rows[0].source_filename if rows else None
+        self._current_rows = revisiones_repo.list_revision_rows_for_import(revision_import_id)
+        filename = self._current_rows[0].source_filename if self._current_rows else None
         self.filename_label.setText(f"Archivo en revisión: {filename}" if filename else SIN_ARCHIVO_TEXT)
         self.archivo_cambiado.emit(filename or "")
 
@@ -199,15 +216,16 @@ class RequerimientosRevisionView(QWidget):
         else:
             self.identity_label.setText("")
 
-        self._refresh_revision_table(rows)
+        self._refresh_revision_table()
 
     def _on_clear(self) -> None:
         self.available_list.clear()
         self._current_import_id = None
+        self._current_rows = []
         self.filename_label.setText(SIN_ARCHIVO_TEXT)
         self.identity_label.setText("")
         self.archivo_cambiado.emit("")
-        self._refresh_revision_table([])
+        self._refresh_revision_table()
 
     # --- Importar ------------------------------------------------------------------
     def _on_import_revision(self) -> None:
@@ -242,6 +260,35 @@ class RequerimientosRevisionView(QWidget):
         filename = Path(file_path).name
         abogado_nombre = abogado.full_name if abogado else None
 
+        if self.dummy:
+            self._current_import_id = -1  # sentinel: no hay import real en la base de datos
+            self._current_rows = [
+                revisiones_repo.RevisionRow(
+                    id=-(i + 1), agente_id=self.agente_user.id, revision_import_id=None,
+                    source_filename=filename, abogado_nombre=abogado_nombre, abogado_id=abogado_id,
+                    folio=r.get("folio"), cta_predial=r.get("cta_predial"), contribuyente=r.get("contribuyente"),
+                    domicilio=r.get("domicilio"), fecha_citatorio=r.get("fecha_citatorio"),
+                    recibe_citatorio=r.get("recibe_citatorio"),
+                    recibe_citatorio_nombre=r.get("recibe_citatorio_nombre"),
+                    fecha_notificacion=r.get("fecha_notificacion"), quien_recibe=r.get("quien_recibe"),
+                    quien_recibe_nombre=r.get("quien_recibe_nombre"), observaciones=r.get("observaciones"),
+                    procede=None, imported_at="",
+                )
+                for i, r in enumerate(result.rows)
+            ]
+            self.filename_label.setText(f"Archivo en revisión (PRUEBA): {filename}")
+            self.archivo_cambiado.emit(filename)
+            self.identity_label.setText(
+                f"Documento de prueba — UUID: {result.document_uuid}  Hash: {result.file_hash}"
+            )
+            self._refresh_revision_table()
+            QMessageBox.information(
+                self, "Importado (prueba)",
+                f"Se importaron {len(result.rows)} filas para revisión. No se guardó nada en la "
+                f"base de datos.\n\nUUID: {result.document_uuid}\nHash: {result.file_hash}",
+            )
+            return
+
         revision_import_id = revisiones_repo.create_revision_import(
             agente_id=self.agente_user.id, source_filename=filename,
             abogado_nombre=abogado_nombre, abogado_id=abogado_id,
@@ -268,7 +315,8 @@ class RequerimientosRevisionView(QWidget):
         )
 
     # --- Tabla de revisión -----------------------------------------------------------
-    def _refresh_revision_table(self, rows: list[revisiones_repo.RevisionRow]) -> None:
+    def _refresh_revision_table(self) -> None:
+        rows = self._current_rows
         self.revision_table.setUpdatesEnabled(False)
         try:
             self.revision_table.setRowCount(len(rows))
@@ -338,22 +386,36 @@ class RequerimientosRevisionView(QWidget):
     def _on_procede_changed(self, row_id: int, combo: QComboBox) -> None:
         if self.simulate:
             return
-        revisiones_repo.update_revision_procede(row_id, combo.currentData())
-        self._refresh_available_list()
+        procede = combo.currentData()
+        if not self.dummy:
+            revisiones_repo.update_revision_procede(row_id, procede)
+            self._refresh_available_list()
+        for row in self._current_rows:
+            if row.id == row_id:
+                row.procede = procede
+                break
 
     def _on_export_revision(self) -> None:
-        rows = revisiones_repo.list_revision_rows(self.agente_user.id)
-        if not rows:
-            QMessageBox.warning(self, "Nada que exportar", "Importe una captura del Abogado primero.")
-            return
-
         if self.simulate:
+            rows = revisiones_repo.list_revision_rows(self.agente_user.id)
+            if not rows:
+                QMessageBox.warning(self, "Nada que exportar", "Importe una captura del Abogado primero.")
+                return
             QMessageBox.information(
                 self, "Simulación", f"Se habrían exportado {len(rows)} filas de revisión. No se exportó nada de verdad."
             )
             return
 
+        rows = self._current_rows if self.dummy else revisiones_repo.list_revision_rows(self.agente_user.id)
+        if not rows:
+            QMessageBox.warning(self, "Nada que exportar", "Importe una captura del Abogado primero.")
+            return
+
         fecha = datetime.now().strftime("%d_%m_%Y")
-        output_path = exports_dir() / f"REVISION DEL {fecha}.xlsx"
+        nombre = f"REVISION DE PRUEBA DEL {fecha}.xlsx" if self.dummy else f"REVISION DEL {fecha}.xlsx"
+        output_path = exports_dir() / nombre
         export_revision(rows, output_path)
-        QMessageBox.information(self, "Exportado", f"Archivo exportado:\n{output_path}")
+        mensaje = f"Archivo exportado:\n{output_path}"
+        if self.dummy:
+            mensaje += "\n\nNo se guardó nada en la base de datos."
+        QMessageBox.information(self, "Exportado", mensaje)

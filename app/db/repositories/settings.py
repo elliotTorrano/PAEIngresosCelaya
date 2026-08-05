@@ -25,6 +25,11 @@ KEY_PDF_THEME_STRUCTURE = "pdf_color_structure"
 # cambia. Ver app/ui/reporteador/reporte_requerimientos_view.py.
 KEY_REPORTE_REQUERIMIENTOS_EXCEL_PATH = "reporte_requerimientos_excel_path"
 KEY_REPORTE_MANDAMIENTOS_EXCEL_PATH = "reporte_mandamientos_excel_path"
+# Token de escritura de Turso para app/sync/user_directory.py -- lo pega el
+# Administrador una sola vez (ver app/ui/admin/*_settings_view.py); nunca
+# viaja horneado en el instalador, a diferencia del token de solo lectura
+# (ver app/sync/config.py).
+KEY_TURSO_WRITE_TOKEN = "turso_write_token"
 
 
 def get(key: str) -> str | None:

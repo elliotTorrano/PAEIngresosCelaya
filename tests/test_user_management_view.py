@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from PySide6.QtWidgets import QGroupBox, QLineEdit, QTableWidget
 
 from app.config import AUTH_TYPE_CERTIFICADO, ROLE_ADMINISTRADOR, ROLE_SUPERUSUARIO
@@ -91,3 +93,49 @@ def test_reporteadores_box_has_no_password_field_and_creates_cert_user(qapp, db)
     assert created is not None
     assert created.role == ROLE_REPORTEADOR
     assert created.auth_type == AUTH_TYPE_CERTIFICADO
+
+
+def test_add_user_pushes_to_remote_directory(qapp, db):
+    from PySide6.QtWidgets import QPushButton
+
+    su = _make_super()
+    view = UserManagementView(su)
+    box = next(b for b in view.findChildren(QGroupBox) if b.title() == "Agentes del PAE")
+
+    inputs = box.findChildren(QLineEdit)
+    inputs[0].setText("agente_nuevo")
+    inputs[1].setText("Agente Nuevo")
+    inputs[2].setText("a@a.com")
+
+    add_btn = next(b for b in box.findChildren(QPushButton) if b.text() == "Agregar")
+    with patch("app.ui.admin.user_management_view.user_directory.push_user") as mock_push:
+        add_btn.click()
+
+    mock_push.assert_called_once()
+    pushed_user = mock_push.call_args[0][0]
+    assert pushed_user.username == "agente_nuevo"
+
+
+def test_sync_now_button_pushes_all_synced_roles(qapp, db):
+    from app.config import ROLE_AGENTE_PAE, ROLE_REPORTEADOR
+    from PySide6.QtWidgets import QPushButton
+
+    users_repo.create_user(
+        username="agente1", role=ROLE_AGENTE_PAE, full_name="Agente Uno", email=None,
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    users_repo.create_user(
+        username="reporteador1", role=ROLE_REPORTEADOR, full_name="Reporteador Uno", email=None,
+        auth_type=AUTH_TYPE_CERTIFICADO,
+    )
+    su = _make_super()
+    view = UserManagementView(su)
+
+    sync_btn = next(b for b in view.findChildren(QPushButton) if b.text() == "Sincronizar ahora")
+    with patch("app.ui.admin.user_management_view.user_directory.push_user") as mock_push, patch(
+        "app.ui.admin.user_management_view.QMessageBox.information"
+    ):
+        sync_btn.click()
+
+    pushed_usernames = {call.args[0].username for call in mock_push.call_args_list}
+    assert pushed_usernames == {"agente1", "reporteador1"}
